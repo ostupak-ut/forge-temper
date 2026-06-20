@@ -15,10 +15,12 @@ import { useGraphStore, type FtNode } from '@/store/graphStore'
 import { nodeTypes } from '@/nodes/nodeTypes'
 import { edgeTypes } from '@/edges/edgeTypes'
 import { getSpec } from '@/registry/nodeSpecs'
+import { usePresets } from '@/io/customPresets'
 import { arePortsCompatible, handleId, PORT_COLOR } from '@/registry/portTypes'
 import type { NodeKind, Port } from '@/registry/types'
 
 const DRAG_MIME = 'application/ft-node'
+const DRAG_PRESET = 'application/ft-preset'
 
 function portOf(
   nodes: FtNode[],
@@ -61,6 +63,7 @@ export function FlowCanvas() {
   const onEdgesChange = useGraphStore((s) => s.onEdgesChange)
   const onConnect = useGraphStore((s) => s.onConnect)
   const addNode = useGraphStore((s) => s.addNode)
+  const addPresetNode = useGraphStore((s) => s.addPresetNode)
   const setSelected = useGraphStore((s) => s.setSelected)
   const setSelectedEdge = useGraphStore((s) => s.setSelectedEdge)
 
@@ -83,12 +86,22 @@ export function FlowCanvas() {
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault()
+      const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY })
+      // A dragged saved agent (preset) carries its id; instantiate it with config.
+      const presetId = e.dataTransfer.getData(DRAG_PRESET)
+      if (presetId) {
+        const p = usePresets.getState().presets.find((x) => x.id === presetId)
+        if (p) {
+          const id = addPresetNode('custom', pos, p.name, p.config)
+          setSelected(id)
+        }
+        return
+      }
       const kind = e.dataTransfer.getData(DRAG_MIME) as NodeKind
       if (!kind) return
-      const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY })
       addNode(kind, pos)
     },
-    [addNode, screenToFlowPosition],
+    [addNode, addPresetNode, setSelected, screenToFlowPosition],
   )
 
   const displayEdges = useMemo(
@@ -152,4 +165,4 @@ export function FlowCanvas() {
   )
 }
 
-export { DRAG_MIME }
+export { DRAG_MIME, DRAG_PRESET }

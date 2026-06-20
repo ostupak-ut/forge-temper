@@ -4,7 +4,7 @@ import { ALL_KINDS, getSpec } from '@/registry/nodeSpecs'
 import { resolveNodeIcon } from '@/registry/icons'
 import { useGraphStore } from '@/store/graphStore'
 import { usePresets } from '@/io/customPresets'
-import { DRAG_MIME } from '@/canvas/FlowCanvas'
+import { DRAG_MIME, DRAG_PRESET } from '@/canvas/FlowCanvas'
 import type { NodeKind } from '@/registry/types'
 
 export function Palette() {
@@ -43,8 +43,10 @@ export function Palette() {
   return (
     <div className="flex h-full w-44 shrink-0 flex-col gap-1 overflow-auto border-r border-white/10 bg-[#0d1320] p-2">
       <button
+        draggable
+        onDragStart={(e) => onDragStart(e, 'custom')}
         onClick={newCustomAgent}
-        title="Create a freely-wireable custom agent — then name it and edit its prompt in the Inspector."
+        title="Create a freely-wireable custom agent — click to add, or drag onto the canvas."
         className="mb-2 flex items-center gap-2 rounded-lg border border-dashed border-temper/60 bg-temper/10 px-2 py-2 text-left text-xs font-medium text-temper transition hover:border-temper hover:bg-temper/20"
       >
         <Sparkles className="size-4 shrink-0" />
@@ -59,7 +61,12 @@ export function Palette() {
             return (
               <div
                 key={p.id}
-                className="group flex items-center gap-2 rounded-lg border border-cyan-400/20 bg-cyan-400/[0.05] px-2 py-1.5 text-xs text-white/85 transition hover:border-cyan-400/40 hover:bg-cyan-400/10"
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData(DRAG_PRESET, p.id)
+                  e.dataTransfer.effectAllowed = 'move'
+                }}
+                className="group flex cursor-grab items-center gap-2 rounded-lg border border-cyan-400/20 bg-cyan-400/[0.05] px-2 py-1.5 text-xs text-white/85 transition hover:border-cyan-400/40 hover:bg-cyan-400/10 active:cursor-grabbing"
               >
                 <button
                   className="flex min-w-0 flex-1 items-center gap-2 text-left"
