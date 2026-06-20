@@ -88,10 +88,10 @@ function GenericNodeImpl({ id, data, selected }: NodeProps<FtNode>) {
   return (
     <div
       className={cn(
-        // No idle border/ring — a filled card + shadow defines the node (the 2px
-        // grey ring read as "white lines" in dark). Colored ring only when active.
-        'relative w-60 rounded-xl bg-card shadow-lg shadow-black/40 ring-2 transition',
-        STATUS_RING[status],
+        // Idle/skipped = NO ring at all (a filled card + shadow defines the node);
+        // a ring only renders for active states. Avoids "white lines" in dark.
+        'relative w-60 rounded-xl bg-card shadow-lg shadow-black/40 transition',
+        status !== 'idle' && status !== 'skipped' && `ring-2 ${STATUS_RING[status]}`,
         selected && 'outline outline-2 outline-temper/60',
       )}
     >

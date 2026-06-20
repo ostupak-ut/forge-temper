@@ -18,20 +18,20 @@ body,
   --card: 18 24 38;
   --field: 6 10 18;
   --fg: 229 231 235;
-  --border: 148 163 184;
+  --border: 51 65 85;   /* slate-700 — dark, subtle (NOT a white line) */
   --grid: 30 41 59;
   color-scheme: dark;
 }
 
-/* Light mode — Financial Times "pink paper" pastel palette (warm cream, not stark white). */
+/* Light mode — Financial Times "pink paper" pastel (warm cream, FT ink). */
 html.light {
   --bg: 255 241 229;     /* FT paper #fff1e5 */
-  --surface: 255 247 238; /* panels — slightly lighter warm */
-  --card: 255 250 244;    /* nodes — warm near-white (never pure #fff) */
-  --field: 245 235 224;   /* inputs — recessed warm */
-  --fg: 38 37 35;         /* warm near-black ink */
-  --border: 51 47 43;     /* warm charcoal (used at low opacity) */
-  --grid: 226 214 200;    /* warm dot grid */
+  --surface: 255 238 224; /* panels — warm pastel cream */
+  --card: 255 244 233;    /* nodes — soft cream (never white) */
+  --field: 250 236 223;   /* inputs — recessed warm */
+  --fg: 51 48 46;         /* FT body ink #33302e */
+  --border: 51 48 46;     /* FT ink for borders (low opacity) */
+  --grid: 233 219 203;    /* warm dot grid */
   color-scheme: light;
 }
 
