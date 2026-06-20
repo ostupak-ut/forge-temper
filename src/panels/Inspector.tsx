@@ -94,7 +94,40 @@ function FilePathField({
   )
 }
 
-/** Model picker: a Claude dropdown for claude-code, a free-text + datalist for other providers. */
+// Config-group order: the things that matter most (Prompt, Verification) sit at
+// the top; the cosmetic "Design" (symbol/color) group sorts last and collapses.
+const GROUP_PRIORITY: Record<string, number> = {
+  Idea: 0,
+  Card: 1,
+  Prompt: 2,
+  Verification: 3,
+  Model: 4,
+  Files: 5,
+  Output: 6,
+  Execution: 7,
+  Warehouse: 8,
+  Config: 9,
+  Design: 10,
+}
+
+// Curated model suggestions for providers without a live model API (codex, the
+// Anthropic harness). They seed the datalist so you can PICK a model — or type
+// any other the CLI/API accepts. OpenRouter fetches its list live instead.
+const SUGGESTED_MODELS: Record<string, { id: string; name: string }[]> = {
+  codex: [
+    { id: 'gpt-5.1-codex', name: 'GPT-5.1 Codex' },
+    { id: 'gpt-5.1-codex-mini', name: 'GPT-5.1 Codex Mini' },
+    { id: 'gpt-5.1', name: 'GPT-5.1' },
+    { id: 'o4-mini', name: 'o4-mini' },
+  ],
+  'anthropic-harness': [
+    { id: 'claude-opus-4-8', name: 'Opus 4.8' },
+    { id: 'claude-sonnet-4-6', name: 'Sonnet 4.6' },
+    { id: 'claude-haiku-4-5', name: 'Haiku 4.5' },
+  ],
+}
+
+/** Model picker: a Claude dropdown for claude-code, a pick-or-type list otherwise. */
 function ModelField({
   provider,
   options,
@@ -123,17 +156,23 @@ function ModelField({
     )
   }
   const listId = `models-${provider}`
+  const curated = SUGGESTED_MODELS[provider] ?? []
+  // Curated suggestions first (codex/harness), then any live-fetched (openrouter).
+  const suggestions = [...curated, ...models.filter((m) => !curated.some((c) => c.id === m.id))]
+  const placeholder = curated.length
+    ? 'pick a model or type one — blank = inherit/CLI default'
+    : 'e.g. openai/gpt-5.1, anthropic/claude-sonnet-4.5'
   return (
     <>
       <input
         className={inputCls + ' font-mono'}
         list={listId}
         value={value === 'inherit' ? '' : value}
-        placeholder="e.g. openai/gpt-5.1, anthropic/claude-sonnet-4.5"
-        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value || 'inherit')}
       />
       <datalist id={listId}>
-        {models.map((m) => (
+        {suggestions.map((m) => (
           <option key={m.id} value={m.id}>
             {m.name}
           </option>
@@ -601,11 +640,22 @@ export function Inspector({ onClose }: { onClose?: () => void }) {
   const setSelectedEdge = useGraphStore((s) => s.setSelectedEdge)
   const onEdgesChange = useGraphStore((s) => s.onEdgesChange)
   const [avail, setAvail] = useState<Record<string, boolean>>({})
+  const [designOpen, setDesignOpen] = useState(false)
   useEffect(() => {
-    fetch('/api/health')
-      .then((r) => r.json())
-      .then((d) => setAvail(d.providers ?? {}))
-      .catch(() => {})
+    const refresh = () =>
+      fetch('/api/health')
+        .then((r) => r.json())
+        .then((d) => setAvail(d.providers ?? {}))
+        .catch(() => {})
+    refresh()
+    // Re-check when Settings saves a key/CLI path (so a newly-added provider
+    // appears in the dropdown without a reload), and when the tab regains focus.
+    window.addEventListener('ft:providers-changed', refresh)
+    window.addEventListener('focus', refresh)
+    return () => {
+      window.removeEventListener('ft:providers-changed', refresh)
+      window.removeEventListener('focus', refresh)
+    }
   }, [])
 
   if (!node || !selectedId) {
@@ -859,20 +909,38 @@ export function Inspector({ onClose }: { onClose?: () => void }) {
           />
         )}
 
-        {[...groups.entries()].map(([group, fields]) => (
-          <fieldset key={group} className="space-y-2">
-            <legend className="text-[10px] font-semibold uppercase tracking-wider text-fg/30">{group}</legend>
-            {fields.map((f) => (
-              <div key={f.key} className="space-y-1">
-                <label className="block text-[11px] text-fg/55">{f.label}</label>
-                {renderField(f)}
-                {f.help && f.kind !== 'boolean' && (
-                  <p className="text-[10px] leading-tight text-fg/25">{f.help}</p>
+        {[...groups.entries()]
+          .sort((a, b) => (GROUP_PRIORITY[a[0]] ?? 5) - (GROUP_PRIORITY[b[0]] ?? 5))
+          .map(([group, fields]) => {
+            const collapsible = group === 'Design'
+            const open = !collapsible || designOpen
+            return (
+              <fieldset key={group} className="space-y-2">
+                {collapsible ? (
+                  <button
+                    type="button"
+                    onClick={() => setDesignOpen((o) => !o)}
+                    className="flex w-full items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-fg/30 hover:text-fg/55"
+                  >
+                    <ChevronRight className={'size-3 transition-transform ' + (open ? 'rotate-90' : '')} />
+                    {group}
+                  </button>
+                ) : (
+                  <legend className="text-[10px] font-semibold uppercase tracking-wider text-fg/30">{group}</legend>
                 )}
-              </div>
-            ))}
-          </fieldset>
-        ))}
+                {open &&
+                  fields.map((f) => (
+                    <div key={f.key} className="space-y-1">
+                      <label className="block text-[11px] text-fg/55">{f.label}</label>
+                      {renderField(f)}
+                      {f.help && f.kind !== 'boolean' && (
+                        <p className="text-[10px] leading-tight text-fg/25">{f.help}</p>
+                      )}
+                    </div>
+                  ))}
+              </fieldset>
+            )
+          })}
       </div>
     </div>
   )

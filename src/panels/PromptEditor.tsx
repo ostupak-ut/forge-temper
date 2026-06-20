@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorView } from '@codemirror/view'
 import { History, Save, Variable } from 'lucide-react'
+import { getTheme, subscribe } from '@/theme'
 
 /** Common template variables available to every agent prompt. */
 const COMMON_VARS = ['iteration', 'temper_report', 'proto_dir', 'field']
@@ -55,6 +56,7 @@ export function PromptEditor({
   onChange: (v: string) => void
 }) {
   const viewRef = useRef<EditorView | null>(null)
+  const isDark = useSyncExternalStore(subscribe, getTheme) === 'dark'
   const [presets, setPresets] = useState<PresetStore>(loadPresets)
   const [showHistory, setShowHistory] = useState(false)
   const [history, setHistory] = useState<string[]>([])
@@ -144,7 +146,7 @@ export function PromptEditor({
       <CodeMirror
         value={value}
         height="120px"
-        theme="dark"
+        theme={isDark ? 'dark' : 'light'}
         extensions={[markdown(), EditorView.lineWrapping, cmTheme]}
         basicSetup={{ lineNumbers: false, foldGutter: false, highlightActiveLine: false }}
         onCreateEditor={(view) => (viewRef.current = view)}

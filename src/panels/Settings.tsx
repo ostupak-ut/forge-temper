@@ -114,6 +114,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
       })
       const d = await r.json()
       setCli({ codex: d.cli?.codex ?? '', claude: d.cli?.claude ?? '' })
+      window.dispatchEvent(new Event('ft:providers-changed'))
     } catch {
       /* ignore */
     }
@@ -132,6 +133,9 @@ export function Settings({ onClose }: { onClose: () => void }) {
     setPresence(d.keys)
     setValues({})
     setSaving(false)
+    // Tell the Inspector to re-check provider availability (so a freshly-added
+    // key, e.g. OpenRouter, shows up in the node Provider dropdown immediately).
+    window.dispatchEvent(new Event('ft:providers-changed'))
   }
 
   const saveFolder = async (dirArg?: string) => {

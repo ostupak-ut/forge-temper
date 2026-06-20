@@ -246,10 +246,10 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
         key: 'symbol',
         label: 'Symbol',
         kind: 'icon',
-        group: 'Agent',
+        group: 'Design',
         help: 'Pick an icon for this agent — it shows on the node and in this panel.',
       },
-      { key: 'color', label: 'Color', kind: 'color', group: 'Agent', help: 'Accent color for this agent node.' },
+      { key: 'color', label: 'Color', kind: 'color', group: 'Design', help: 'Accent color for this agent node.' },
       ...agentFields({
         promptHelp:
           'Your instructions. {{in}} = upstream output, {{files}} = staged files, {{temper_report}}/{{feedback}} on loop re-runs.',
