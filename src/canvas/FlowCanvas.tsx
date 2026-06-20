@@ -95,9 +95,12 @@ export function FlowCanvas() {
       const tgtPort = portOf(nodes, c.target, 'in', c.targetHandle ?? null)
       if (!srcPort || !tgtPort) return false
       if (!arePortsCompatible(srcPort.type, tgtPort.type)) return false
-      // A loopInternal target (Forge's feedback) is allowed to close the visual
-      // loop; every other connection must keep the outer graph acyclic.
-      if (!tgtPort.loopInternal && wouldCreateCycle(nodes, edges, c.source, c.target)) return false
+      // Keep the outer graph acyclic over FORWARD edges only — feedback back-edges
+      // are the explicit loop-closers, so they must NOT count here. Otherwise an
+      // existing back-edge (e.g. C→A.feedback) makes the guard think a legit
+      // forward edge (B→C) would close a cycle, and wrongly blocks it.
+      const forwardEdges = edges.filter((e) => e.type !== 'feedback')
+      if (!tgtPort.loopInternal && wouldCreateCycle(nodes, forwardEdges, c.source, c.target)) return false
       return true
     },
     [nodes, edges],
