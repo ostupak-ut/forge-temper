@@ -29,6 +29,7 @@ export function buildGraphContext(node: GraphNode, nodes: GraphNode[], edges: Gr
   const fwd = edges.filter((e) => !isFeedback(e))
   const incoming = fwd.filter((e) => e.target === node.id).map((e) => named(e.source))
   const outgoing = fwd.filter((e) => e.source === node.id).map((e) => named(e.target))
+  const feedsWarehouse = fwd.some((e) => e.source === node.id && byId.get(e.target)?.data.kind === 'warehouse')
   const flow = fwd.map((e) => `  ${label(e.source)} → ${label(e.target)}`)
   const loops = edges
     .filter(isFeedback)
@@ -54,5 +55,10 @@ export function buildGraphContext(node: GraphNode, nodes: GraphNode[], edges: Gr
   lines.push(
     'Act so your output is exactly what the downstream steps need, and stay consistent with what the upstream steps produced. Do only YOUR step — the others handle theirs.',
   )
+  if (feedsWarehouse) {
+    lines.push(
+      'IMPORTANT: a Warehouse downstream COLLECTS your results from disk. SAVE your output artifact(s) as real files in your current working directory (e.g. actually write/compile the .pdf, .md, or .tex) — do NOT just describe them in your reply, or nothing will be collected.',
+    )
+  }
   return lines.join('\n')
 }

@@ -381,34 +381,34 @@ async function archiveWarehouse(
     if (!src || DATA_KINDS.has(src.data.kind)) continue // data nodes produce no artifacts
     const srcCwd = resolveCwd(effectiveWorkingDir(src, nodes, edges))
     const label = String(src.data.label || src.data.kind).replace(/[^\w.\- ]/g, '_')
-    // proto/ holds the prototype artifacts; fall back to the working dir top-level.
-    for (const d of [path.join(srcCwd, 'proto'), srcCwd]) {
-      if (!existsSync(d)) continue
-      let names: string[] = []
+    // Recursively collect matching OUTPUT files from the agent's working dir
+    // (incl. proto/), skipping staged inputs, the skill file, vcs/deps + junk.
+    const hits: string[] = []
+    const walkOut = (dir: string, rel: string): void => {
+      let ents
       try {
-        names = readdirSync(d)
+        ents = readdirSync(dir, { withFileTypes: true })
       } catch {
-        continue
+        return
       }
-      const hits = names.filter((nm) => {
-        try {
-          return statSync(path.join(d, nm)).isFile() && matches(nm)
-        } catch {
-          return false
-        }
-      })
-      if (!hits.length) continue
-      mkdirSync(runDir, { recursive: true })
-      for (const nm of hits) {
-        try {
-          // Flat naming (label__file) so the gallery lists a run in one call.
-          copyFileSync(path.join(d, nm), path.join(runDir, `${label}__${nm}`))
-          count++
-        } catch {
-          /* skip */
-        }
+      for (const ent of ents) {
+        if (ent.name === 'inputs' || ent.name === 'node_modules' || ent.name === '.git') continue
+        const rChild = rel ? `${rel}/${ent.name}` : ent.name
+        if (ent.isDirectory()) walkOut(path.join(dir, ent.name), rChild)
+        else if (!ent.name.startsWith('.skill-') && matches(ent.name)) hits.push(rChild)
       }
-      break // proto/ preferred — don't also pull from the cwd top-level
+    }
+    walkOut(srcCwd, '')
+    if (!hits.length) continue
+    mkdirSync(runDir, { recursive: true })
+    for (const r of hits) {
+      try {
+        // Flat naming (label__path) so the gallery lists a run in one call.
+        copyFileSync(path.join(srcCwd, r), path.join(runDir, `${label}__${r.replace(/\//g, '_')}`))
+        count++
+      } catch {
+        /* skip */
+      }
     }
   }
 
