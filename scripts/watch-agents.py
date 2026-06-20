@@ -66,10 +66,23 @@ def crack_sound(muted, combo):
     sys.stdout.write("\a"); sys.stdout.flush()
 
 
+def run_recency(run_dir):
+    """Newest mtime among a run's jsonl FILES — tracks live appends (a dir's
+    mtime doesn't bump when a file inside is appended, which made the deck stick
+    to stale runs)."""
+    t = 0.0
+    for f in [os.path.join(run_dir, "journal.jsonl"), *glob.glob(os.path.join(run_dir, "agent-*.jsonl"))]:
+        try:
+            t = max(t, os.path.getmtime(f))
+        except OSError:
+            pass
+    return t
+
+
 def newest_run():
     cands = glob.glob(os.path.join(BASE, "*", "subagents", "workflows", "wf_*"))
     cands = [c for c in cands if os.path.isfile(os.path.join(c, "journal.jsonl"))]
-    return max(cands, key=os.path.getmtime) if cands else None
+    return max(cands, key=run_recency) if cands else None
 
 
 def jread(path):
@@ -146,7 +159,10 @@ def render(run_dir, S):
     for a in agents:  # token history for sparklines
         S["hist"][a["label"]].append(a["tout"])
     L = []
-    L.append(f"  {RED}{B}➿{R}  {B}{WHITE}FORGE · TEMPER{R} {DIM}— agent whip deck{R}        {DIM}{time.strftime('%H:%M:%S')}{R}")
+    age = max(0, int(time.time() - run_recency(run_dir)))
+    live = f"{GREEN}● live{R}" if age < 6 else f"{DIM}updated {age}s ago{R}"
+    rid = os.path.basename(run_dir)
+    L.append(f"  {RED}{B}➿{R}  {B}{WHITE}FORGE · TEMPER{R} {DIM}— whip deck{R}   {live}  {DIM}{rid[:13]} · {time.strftime('%H:%M:%S')}{R}")
     L.append(f"  {CYAN}╭{'─' * 66}╮{R}")
     for a in agents:
         lab = a["label"]; acc = ACCENT.get(lab, GREY)
