@@ -121,6 +121,19 @@ export async function fsRoutes(app: FastifyInstance) {
     }
   })
 
+  // Create a directory at an absolute path (for the project-root picker's
+  // "New folder"). Not workspace-confined — same rationale as /browse.
+  app.post('/api/fs/mkdir', async (req, reply) => {
+    const p = String((req.query as { path?: string }).path ?? '').trim()
+    if (!p || !path.isAbsolute(p)) return reply.code(400).send({ error: 'absolute path required' })
+    try {
+      await mkdir(p, { recursive: true })
+      return { ok: true, path: p }
+    } catch (e) {
+      return reply.code(400).send({ error: String((e as Error)?.message ?? e) })
+    }
+  })
+
   // Delete a file or folder (recursive), confined to the workspace.
   app.delete('/api/fs/delete', async (req, reply) => {
     const rel = String((req.query as { path?: string }).path ?? '').trim()

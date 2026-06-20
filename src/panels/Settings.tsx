@@ -36,6 +36,19 @@ export function Settings({ onClose }: { onClose: () => void }) {
     }
   }
 
+  const createFolder = async () => {
+    if (!browse) return
+    const name = window.prompt('New folder name (created inside the current folder):')?.trim()
+    if (!name) return
+    try {
+      const r = await fetch(`/api/fs/mkdir?path=${encodeURIComponent(`${browse.path}/${name}`)}`, { method: 'POST' })
+      const d = await r.json()
+      if (d.ok) openBrowse(browse.path)
+    } catch {
+      /* ignore */
+    }
+  }
+
   useEffect(() => {
     fetch('/api/settings')
       .then((r) => r.json())
@@ -188,6 +201,13 @@ export function Settings({ onClose }: { onClose: () => void }) {
                   ⬆ up
                 </button>
                 <span className="min-w-0 flex-1 truncate font-mono">{browse.path}</span>
+                <button
+                  onClick={createFolder}
+                  className="shrink-0 rounded px-1 py-0.5 text-emerald-300 hover:bg-fg/10"
+                  title="Create a new folder here"
+                >
+                  + New folder
+                </button>
               </div>
               <div className="max-h-40 overflow-auto">
                 {browse.dirs.length === 0 && <p className="px-1 py-1 text-[10px] text-fg/30">(no subfolders)</p>}
