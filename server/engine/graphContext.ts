@@ -31,6 +31,40 @@ Act so your output is exactly what the downstream steps need, and stay consisten
 
 const isFeedback = (e: GraphEdge): boolean => e.type === 'feedback' || Boolean(e.data?.loopBackEdge)
 
+const firstLine = (s: string, max: number): string => {
+  const line = s.replace(/\s+/g, ' ').trim()
+  return line.length > max ? `${line.slice(0, max - 1)}…` : line
+}
+
+/** A one-line "what this node actually does", from its kind + config. */
+function describeNode(n: GraphNode): string {
+  const cfg = (n.data.config ?? {}) as Record<string, unknown>
+  const kind = n.data.kind
+  if (kind === 'custom') {
+    if (cfg.verifier === true) {
+      const pc = typeof cfg.passCondition === 'string' ? cfg.passCondition.trim() : ''
+      return `loop VERIFIER — passes when: ${pc ? firstLine(pc, 140) : '(judges whether the latest output is correct/complete)'}`
+    }
+    const p = typeof cfg.prompt === 'string' ? cfg.prompt.trim() : ''
+    return p ? firstLine(p, 160) : 'custom agent — no prompt set yet'
+  }
+  if (AGENT_PURPOSE[kind]) return AGENT_PURPOSE[kind]
+  if (kind === 'idea') {
+    const t = typeof cfg.text === 'string' ? cfg.text.trim() : ''
+    return t ? `idea seed: “${firstLine(t, 140)}”` : 'an (empty) idea seed'
+  }
+  if (kind === 'infocard') {
+    const t = typeof cfg.title === 'string' ? cfg.title.trim() : ''
+    return t ? `info card: ${firstLine(t, 120)}` : 'an info card'
+  }
+  if (kind === 'file') {
+    const paths = Array.isArray(cfg.paths) ? (cfg.paths as unknown[]).map((p) => String(p)) : []
+    return paths.length ? `files: ${paths.map((p) => p.split('/').pop()).join(', ')}` : 'a (empty) files node'
+  }
+  if (kind === 'warehouse') return 'collects results from disk into an indexed, accumulating pile'
+  return kind
+}
+
 /** The dynamic structural map only (no heading / instructions) — fills {{graph}}. */
 function buildGraphMap(node: GraphNode, nodes: GraphNode[], edges: GraphEdge[]): { map: string; feedsWarehouse: boolean } {
   const byId = new Map(nodes.map((n) => [n.id, n]))
@@ -60,6 +94,13 @@ function buildGraphMap(node: GraphNode, nodes: GraphNode[], edges: GraphEdge[]):
     if (loops.length) {
       lines.push('Loops:')
       lines.push(...loops)
+    }
+  }
+  if (nodes.length > 1) {
+    lines.push('')
+    lines.push('What each step does:')
+    for (const n of nodes) {
+      lines.push(`  ${n.data.label} (${n.data.kind})${n.id === node.id ? ' (you)' : ''}: ${describeNode(n)}`)
     }
   }
   return { map: lines.join('\n'), feedsWarehouse }

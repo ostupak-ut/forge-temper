@@ -40,6 +40,14 @@ export interface NodeVerdict {
   protoDir?: string
 }
 
+/** Parse a custom Verifier agent's `VERDICT: PASS|FAIL` line into a verdict. */
+function parseCustomVerdict(text: string): NodeVerdict | undefined {
+  const m = /VERDICT:\s*(PASS|FAIL)/i.exec(text)
+  if (!m) return undefined
+  const pass = m[1].toUpperCase() === 'PASS'
+  return { distribution: { v: pass ? 1 : 0, p: 0, h: 0, c: pass ? 0 : 1 }, allCorrect: pass, results: 1 }
+}
+
 export interface RunOneOpts {
   /** Extra {{var}} substitutions (e.g. temper_report/feedback injected by the loop driver). */
   vars?: Record<string, string>
@@ -294,7 +302,14 @@ export async function runOneNode(
     enabled: getGraphAware(),
     template: getGraphTemplate() ?? undefined,
   })
-  const systemAppend = [graphContext, userAppend].filter(Boolean).join('\n\n---\n\n')
+  // A custom Verifier agent emits a PASS/FAIL line the loop reads as its verdict,
+  // so an until-pass loop can converge on a custom agent (not just Temper).
+  const isVerifier = node.data.kind === 'custom' && cfg.verifier === true
+  const passCondition = typeof cfg.passCondition === 'string' ? cfg.passCondition.trim() : ''
+  const verifierDirective = isVerifier
+    ? `## Loop verifier role\nYou are this loop's VERIFIER. Judge whether the work so far meets the PASS CONDITION. Reason briefly, then output EXACTLY one final line — \`VERDICT: PASS\` or \`VERDICT: FAIL\` — with nothing after it.\nPASS CONDITION: ${passCondition || '(not specified — judge whether the latest input is correct and complete)'}`
+    : ''
+  const systemAppend = [graphContext, userAppend, verifierDirective].filter(Boolean).join('\n\n---\n\n')
 
   const runResult = await provider.run({
     runId,
@@ -338,6 +353,20 @@ export async function runOneNode(
         nodeId: node.id,
         status: 'done',
         structured: { ...v, protoDir: protoRel },
+      })
+    }
+  } else if (runResult.ok && isVerifier) {
+    // A custom Verifier agent: parse its PASS/FAIL line into the loop's verdict.
+    const v = parseCustomVerdict(runResult.result ?? '')
+    if (v) {
+      verdict = v
+      emitEvent(runId, {
+        type: 'verdict',
+        nodeId: node.id,
+        distribution: v.distribution,
+        allCorrect: v.allCorrect,
+        results: v.results,
+        ...(opts.iteration != null ? { iteration: opts.iteration } : {}),
       })
     }
   }
