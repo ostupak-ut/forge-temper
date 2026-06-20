@@ -1,9 +1,8 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorView } from '@codemirror/view'
 import { History, Save, Variable } from 'lucide-react'
-import { getTheme, subscribe } from '@/theme'
 
 /** Common template variables available to every agent prompt. */
 const COMMON_VARS = ['iteration', 'temper_report', 'proto_dir', 'field']
@@ -37,9 +36,15 @@ function pushHistory(nodeId: string, value: string) {
   localStorage.setItem(`ft.promptHistory.${nodeId}`, JSON.stringify(next))
 }
 
+// No built-in CM theme (theme="none"); we paint a transparent background so the
+// bg-field container shows through (matching the other inputs in both light/dark)
+// and force text/caret to the theme --fg color.
 const cmTheme = EditorView.theme({
   '&': { fontSize: '12px', backgroundColor: 'transparent' },
-  '.cm-content': { fontFamily: 'ui-monospace, monospace', color: 'rgb(var(--fg))' },
+  '.cm-scroller': { backgroundColor: 'transparent' },
+  '.cm-content': { fontFamily: 'ui-monospace, monospace', color: 'rgb(var(--fg))', caretColor: 'rgb(var(--fg))' },
+  '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'rgb(var(--fg))' },
+  '.cm-activeLine': { backgroundColor: 'transparent' },
   '.cm-gutters': { display: 'none' },
   '&.cm-focused': { outline: 'none' },
 })
@@ -56,7 +61,6 @@ export function PromptEditor({
   onChange: (v: string) => void
 }) {
   const viewRef = useRef<EditorView | null>(null)
-  const isDark = useSyncExternalStore(subscribe, getTheme) === 'dark'
   const [presets, setPresets] = useState<PresetStore>(loadPresets)
   const [showHistory, setShowHistory] = useState(false)
   const [history, setHistory] = useState<string[]>([])
@@ -146,7 +150,7 @@ export function PromptEditor({
       <CodeMirror
         value={value}
         height="120px"
-        theme={isDark ? 'dark' : 'light'}
+        theme="none"
         extensions={[markdown(), EditorView.lineWrapping, cmTheme]}
         basicSetup={{ lineNumbers: false, foldGutter: false, highlightActiveLine: false }}
         onCreateEditor={(view) => (viewRef.current = view)}

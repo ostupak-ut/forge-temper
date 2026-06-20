@@ -680,6 +680,8 @@ export function Inspector({ onClose }: { onClose?: () => void }) {
   const Icon = resolveNodeIcon(cfg.symbol, spec.icon)
   const accent = typeof cfg.color === 'string' && cfg.color ? cfg.color : spec.color
   const variables = spec.inputs.map((p) => p.id)
+  // "Design" (symbol + color) lives in a popover off the avatar, not the panel.
+  const designFields = spec.fields.filter((f) => f.group === 'Design')
 
   const groups = new Map<string, FieldDescriptor[]>()
   for (const f of spec.fields) {
@@ -800,13 +802,47 @@ export function Inspector({ onClose }: { onClose?: () => void }) {
 
   return (
     <div className="flex h-full w-80 shrink-0 flex-col border-l border-border/10 bg-surface">
-      <div className="flex items-center gap-1.5 border-b border-border/10 px-3 py-2">
-        <Icon className="size-4 shrink-0" style={{ color: accent }} />
+      <div className="relative flex items-center gap-1.5 border-b border-border/10 px-3 py-2">
+        {designFields.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => setDesignOpen((o) => !o)}
+            title="Customize symbol & color"
+            className="shrink-0 rounded-md p-0.5 ring-1 ring-transparent transition hover:bg-fg/5 hover:ring-border/30"
+          >
+            <Icon className="size-4" style={{ color: accent }} />
+          </button>
+        ) : (
+          <Icon className="size-4 shrink-0" style={{ color: accent }} />
+        )}
         <input
           className="min-w-0 flex-1 bg-transparent text-sm font-medium text-fg/90 outline-none"
           value={node.data.label}
           onChange={(e) => updateNodeLabel(selectedId, e.target.value)}
         />
+        {designOpen && designFields.length > 0 && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setDesignOpen(false)} />
+            <div className="absolute left-2 top-12 z-20 w-64 space-y-3 rounded-lg border border-border/15 bg-card p-3 shadow-xl">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-fg/40">Design</span>
+                <button
+                  onClick={() => setDesignOpen(false)}
+                  title="Close"
+                  className="rounded p-0.5 text-fg/40 hover:bg-fg/10"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </div>
+              {designFields.map((f) => (
+                <div key={f.key} className="space-y-1">
+                  <label className="block text-[11px] text-fg/55">{f.label}</label>
+                  {renderField(f)}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
         {spec.fields.some((f) => f.kind === 'prompt') &&
           (run?.status === 'running' || run?.status === 'queued' ? (
             <button
@@ -904,37 +940,22 @@ export function Inspector({ onClose }: { onClose?: () => void }) {
         )}
 
         {[...groups.entries()]
+          .filter(([group]) => group !== 'Design') // Design lives in the avatar popover
           .sort((a, b) => (GROUP_PRIORITY[a[0]] ?? 5) - (GROUP_PRIORITY[b[0]] ?? 5))
-          .map(([group, fields]) => {
-            const collapsible = group === 'Design'
-            const open = !collapsible || designOpen
-            return (
-              <fieldset key={group} className="space-y-2">
-                {collapsible ? (
-                  <button
-                    type="button"
-                    onClick={() => setDesignOpen((o) => !o)}
-                    className="flex w-full items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-fg/30 hover:text-fg/55"
-                  >
-                    <ChevronRight className={'size-3 transition-transform ' + (open ? 'rotate-90' : '')} />
-                    {group}
-                  </button>
-                ) : (
-                  <legend className="text-[10px] font-semibold uppercase tracking-wider text-fg/30">{group}</legend>
-                )}
-                {open &&
-                  fields.map((f) => (
-                    <div key={f.key} className="space-y-1">
-                      <label className="block text-[11px] text-fg/55">{f.label}</label>
-                      {renderField(f)}
-                      {f.help && f.kind !== 'boolean' && (
-                        <p className="text-[10px] leading-tight text-fg/25">{f.help}</p>
-                      )}
-                    </div>
-                  ))}
-              </fieldset>
-            )
-          })}
+          .map(([group, fields]) => (
+            <fieldset key={group} className="space-y-2">
+              <legend className="text-[10px] font-semibold uppercase tracking-wider text-fg/30">{group}</legend>
+              {fields.map((f) => (
+                <div key={f.key} className="space-y-1">
+                  <label className="block text-[11px] text-fg/55">{f.label}</label>
+                  {renderField(f)}
+                  {f.help && f.kind !== 'boolean' && (
+                    <p className="text-[10px] leading-tight text-fg/25">{f.help}</p>
+                  )}
+                </div>
+              ))}
+            </fieldset>
+          ))}
       </div>
     </div>
   )
