@@ -115,6 +115,7 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
 
   infocard: {
     kind: 'infocard',
+    hidePalette: true,
     label: 'Info Card',
     description: 'Documentation card (forge produces this): title, abstract, contributions of the prototype.',
     color: '#a855f7',
@@ -177,6 +178,7 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
 
   forge: {
     kind: 'forge',
+    hidePalette: true,
     label: 'Forge',
     description: 'Drafts a paper version + a machine-checkable results skeleton.',
     color: '#e8743b',
@@ -199,6 +201,7 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
 
   temper: {
     kind: 'temper',
+    hidePalette: true,
     label: 'Temper',
     description: 'Verifies the skeleton algebraically + numerically; emits a structured verdict.',
     color: '#3b9ae8',
@@ -299,6 +302,7 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
 
   body: {
     kind: 'body',
+    hidePalette: true,
     label: 'Body',
     description: 'Writes the model/results exposition around the VERIFIED theorems (olehwrites).',
     color: '#eab308',
@@ -316,6 +320,7 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
 
   literature: {
     kind: 'literature',
+    hidePalette: true,
     label: 'Literature',
     description: 'Writes related work / lit review; consumes & emits .bib (olehwrites).',
     color: '#14b8a6',

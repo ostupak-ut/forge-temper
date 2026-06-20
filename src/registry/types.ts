@@ -90,4 +90,10 @@ export interface NodeSpec {
   isContainer?: boolean
   /** Which React Flow node component renders it. */
   reactFlowType: 'ftNode' | 'ftGroup'
+  /**
+   * Hide from the node Palette (still in the registry, so saved graphs render and
+   * a Custom Agent can take on the same role via its skill picker). Used for the
+   * built-in domain agents (forge/temper/body/literature) + the doc Info Card.
+   */
+  hidePalette?: boolean
 }
