@@ -1,6 +1,7 @@
 import { query, type Options } from '@anthropic-ai/claude-agent-sdk'
 import { emitEvent } from './runEvents'
 import { runStore } from '../persistence/runStore'
+import { getCli } from '../persistence/settingsStore'
 import type { ProviderRunParams, ProviderRunResult } from '../providers/types'
 
 /** Execute a single node by invoking local Claude Code, streaming events out. */
@@ -29,6 +30,8 @@ export async function runNode(p: ProviderRunParams): Promise<ProviderRunResult> 
     ...(p.cwd ? { cwd: p.cwd } : {}),
     ...(p.model && p.model !== 'inherit' ? { model: p.model } : {}),
     ...(p.allowedTools?.length ? { allowedTools: p.allowedTools } : {}),
+    // Settings → CLI paths: override the claude binary the SDK spawns.
+    ...(getCli('claude') ? { pathToClaudeCodeExecutable: getCli('claude') } : {}),
   }
 
   let resultText = ''

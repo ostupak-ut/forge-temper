@@ -5,6 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { emitEvent } from './runEvents'
 import { runStore } from '../persistence/runStore'
+import { getCli } from '../persistence/settingsStore'
 import type { ProviderRunParams, ProviderRunResult } from '../providers/types'
 
 /**
@@ -33,6 +34,8 @@ import type { ProviderRunParams, ProviderRunResult } from '../providers/types'
  * that never lands on PATH, so a plain `which codex` misses it.
  */
 export function resolveCodexBin(): string {
+  const override = getCli('codex') // Settings → CLI paths (explicit wins)
+  if (override) return override
   if (process.env.CODEX_BIN) return process.env.CODEX_BIN
   const roots = ['.vscode/extensions', '.vscode-insiders/extensions', '.vscode-server/extensions', '.cursor/extensions']
   for (const rootRel of roots) {

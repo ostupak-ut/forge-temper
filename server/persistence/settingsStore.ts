@@ -3,6 +3,7 @@ import path from 'node:path'
 import { DATA_DIR, setWorkspaceDir } from '../config'
 
 export type ProviderKey = 'openrouter' | 'openai' | 'anthropic'
+export type CliName = 'codex' | 'claude'
 
 const FILE = path.join(DATA_DIR, 'settings.json')
 const ENV_VAR: Record<ProviderKey, string> = {
@@ -15,9 +16,10 @@ mkdirSync(DATA_DIR, { recursive: true })
 
 let keys: Partial<Record<ProviderKey, string>> = {}
 let workspaceDir: string | null = null
+let cli: Partial<Record<CliName, string>> = {}
 
 function persist() {
-  writeFileSync(FILE, JSON.stringify({ providerKeys: keys, workspaceDir }, null, 2), { mode: 0o600 })
+  writeFileSync(FILE, JSON.stringify({ providerKeys: keys, workspaceDir, cli }, null, 2), { mode: 0o600 })
 }
 
 function load() {
@@ -26,9 +28,11 @@ function load() {
       const j = JSON.parse(readFileSync(FILE, 'utf8'))
       keys = j.providerKeys ?? {}
       workspaceDir = typeof j.workspaceDir === 'string' && j.workspaceDir.trim() ? j.workspaceDir : null
+      cli = j.cli && typeof j.cli === 'object' ? j.cli : {}
     } catch {
       keys = {}
       workspaceDir = null
+      cli = {}
     }
   }
   // Merge into env so spawned children + fetch() inherit them.
@@ -77,5 +81,25 @@ export function setWorkspaceSetting(dir: string | null): void {
   const next = typeof dir === 'string' && dir.trim() ? path.resolve(dir.trim()) : null
   workspaceDir = next
   setWorkspaceDir(next)
+  persist()
+}
+
+/** Overridden CLI binary path (codex/claude), or undefined to auto-detect. */
+export function getCli(name: CliName): string | undefined {
+  const v = cli[name]
+  return typeof v === 'string' && v.trim() ? v.trim() : undefined
+}
+
+export function getCliSettings(): Record<CliName, string> {
+  return { codex: cli.codex ?? '', claude: cli.claude ?? '' }
+}
+
+/** Set/clear CLI path overrides. Empty string clears (back to auto-detect). */
+export function setCliSettings(partial: Partial<Record<CliName, string>>): void {
+  for (const [k, v] of Object.entries(partial)) {
+    const name = k as CliName
+    if (typeof v === 'string' && v.trim()) cli[name] = v.trim()
+    else delete cli[name]
+  }
   persist()
 }

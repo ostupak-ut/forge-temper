@@ -1,10 +1,13 @@
 import type { FastifyInstance } from 'fastify'
 import {
+  getCliSettings,
   getKey,
   getWorkspaceSetting,
   keyPresence,
+  setCliSettings,
   setKeys,
   setWorkspaceSetting,
+  type CliName,
   type ProviderKey,
 } from '../persistence/settingsStore'
 import { DEFAULT_WORKSPACE_DIR, getWorkspaceDir } from '../config'
@@ -16,10 +19,14 @@ export async function settingsRoutes(app: FastifyInstance) {
     workspaceDir: getWorkspaceDir(),
     workspaceOverride: getWorkspaceSetting(),
     defaultWorkspaceDir: DEFAULT_WORKSPACE_DIR,
+    cli: getCliSettings(),
   }))
 
   app.post('/api/settings', async (req) => {
-    const body = (req.body ?? {}) as Partial<Record<ProviderKey, string>> & { workspaceDir?: unknown }
+    const body = (req.body ?? {}) as Partial<Record<ProviderKey, string>> & {
+      workspaceDir?: unknown
+      cli?: Partial<Record<CliName, string>>
+    }
     if ('workspaceDir' in body) {
       const wd = body.workspaceDir
       // Reject empty: clearing (revert to default) requires an explicit null.
@@ -28,7 +35,8 @@ export async function settingsRoutes(app: FastifyInstance) {
       }
       setWorkspaceSetting(wd === null ? null : (wd as string))
     }
-    const { workspaceDir: _wd, ...keyBody } = body
+    if (body.cli && typeof body.cli === 'object') setCliSettings(body.cli)
+    const { workspaceDir: _wd, cli: _cli, ...keyBody } = body
     setKeys(keyBody as Partial<Record<ProviderKey, string>>)
     return {
       ok: true,
@@ -36,6 +44,7 @@ export async function settingsRoutes(app: FastifyInstance) {
       workspaceDir: getWorkspaceDir(),
       workspaceOverride: getWorkspaceSetting(),
       defaultWorkspaceDir: DEFAULT_WORKSPACE_DIR,
+      cli: getCliSettings(),
     }
   })
 

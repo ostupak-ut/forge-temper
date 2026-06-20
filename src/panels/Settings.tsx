@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
-import { FolderOpen, KeyRound, X } from 'lucide-react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
+import { FolderOpen, KeyRound, Terminal, Type, X } from 'lucide-react'
+import { FONT_OPTIONS, getFont, setFont, subscribeFont, type AppFont } from '@/font'
 
 type Presence = { openrouter: boolean; openai: boolean; anthropic: boolean }
 
@@ -18,6 +19,9 @@ export function Settings({ onClose }: { onClose: () => void }) {
   const [folderInput, setFolderInput] = useState('')
   const [savingFolder, setSavingFolder] = useState(false)
   const [folderError, setFolderError] = useState('')
+  const [cli, setCli] = useState<{ codex: string; claude: string }>({ codex: '', claude: '' })
+  const [savingCli, setSavingCli] = useState(false)
+  const font = useSyncExternalStore(subscribeFont, getFont)
 
   useEffect(() => {
     fetch('/api/settings')
@@ -27,9 +31,26 @@ export function Settings({ onClose }: { onClose: () => void }) {
         setWorkspaceDir(d.workspaceDir ?? '')
         setDefaultDir(d.defaultWorkspaceDir ?? '')
         setFolderInput(d.workspaceDir ?? '')
+        setCli({ codex: d.cli?.codex ?? '', claude: d.cli?.claude ?? '' })
       })
       .catch(() => {})
   }, [])
+
+  const saveCli = async () => {
+    setSavingCli(true)
+    try {
+      const r = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cli }),
+      })
+      const d = await r.json()
+      setCli({ codex: d.cli?.codex ?? '', claude: d.cli?.claude ?? '' })
+    } catch {
+      /* ignore */
+    }
+    setSavingCli(false)
+  }
 
   const save = async () => {
     setSaving(true)
@@ -88,6 +109,26 @@ export function Settings({ onClose }: { onClose: () => void }) {
 
         <div className="mb-4 space-y-2 rounded-lg border border-border/15 bg-fg/[0.03] p-3">
           <div className="flex items-center gap-2 text-xs font-medium text-fg/80">
+            <Type className="size-4 text-temper" />
+            Appearance
+          </div>
+          <label className="block text-[11px] text-fg/55">App font</label>
+          <select
+            value={font}
+            onChange={(e) => setFont(e.target.value as AppFont)}
+            className="w-full rounded-md border border-border/15 bg-card px-2 py-1 text-xs text-fg/90 outline-none focus:border-temper"
+          >
+            {FONT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value} className="bg-card">
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <p className="text-[10px] text-fg/30">Applies instantly, saved in your browser. Toggle light/dark with the ☀/🌙 in the header.</p>
+        </div>
+
+        <div className="mb-4 space-y-2 rounded-lg border border-border/15 bg-fg/[0.03] p-3">
+          <div className="flex items-center gap-2 text-xs font-medium text-fg/80">
             <FolderOpen className="size-4 text-emerald-300" />
             Project folder
           </div>
@@ -123,6 +164,39 @@ export function Settings({ onClose }: { onClose: () => void }) {
               className="shrink-0 rounded-md bg-emerald-500/20 px-3 py-1 text-xs text-emerald-300 hover:bg-emerald-500/30 disabled:opacity-50"
             >
               {savingFolder ? 'Saving…' : 'Save folder'}
+            </button>
+          </div>
+        </div>
+
+        <div className="mb-4 space-y-2 rounded-lg border border-border/15 bg-fg/[0.03] p-3">
+          <div className="flex items-center gap-2 text-xs font-medium text-fg/80">
+            <Terminal className="size-4 text-sky-300" />
+            CLI paths
+          </div>
+          <p className="text-[11px] text-fg/40">
+            Auto-detected by default (Claude Code on PATH; Codex from the IDE extension). Override only if yours live
+            elsewhere.
+          </p>
+          {(['codex', 'claude'] as const).map((name) => (
+            <div key={name} className="space-y-1">
+              <label className="block text-[11px] capitalize text-fg/55">{name} CLI path</label>
+              <input
+                type="text"
+                spellCheck={false}
+                placeholder="auto-detected"
+                value={cli[name]}
+                onChange={(e) => setCli((c) => ({ ...c, [name]: e.target.value }))}
+                className="w-full rounded-md border border-border/15 bg-card px-2 py-1 font-mono text-xs text-fg/90 outline-none focus:border-temper"
+              />
+            </div>
+          ))}
+          <div className="flex justify-end">
+            <button
+              onClick={saveCli}
+              disabled={savingCli}
+              className="rounded-md bg-sky-500/20 px-3 py-1 text-xs text-sky-300 hover:bg-sky-500/30 disabled:opacity-50"
+            >
+              {savingCli ? 'Saving…' : 'Save CLI paths'}
             </button>
           </div>
         </div>
