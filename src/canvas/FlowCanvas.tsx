@@ -9,6 +9,7 @@ import {
   MarkerType,
   MiniMap,
   ReactFlow,
+  SelectionMode,
   useReactFlow,
 } from '@xyflow/react'
 import { useGraphStore, type FtNode } from '@/store/graphStore'
@@ -148,6 +149,10 @@ export function FlowCanvas() {
       defaultEdgeOptions={{ type: 'default' }}
       proOptions={{ hideAttribution: true }}
       deleteKeyCode={['Delete', 'Backspace']}
+      multiSelectionKeyCode={['Meta', 'Shift']}
+      selectionOnDrag
+      selectionMode={SelectionMode.Partial}
+      panOnDrag={[1, 2]}
       fitView
       minZoom={0.2}
       maxZoom={2}

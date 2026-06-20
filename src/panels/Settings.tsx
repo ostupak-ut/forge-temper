@@ -73,9 +73,9 @@ export function Settings({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60" onClick={onClose}>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="w-[28rem] rounded-xl border border-border/15 bg-surface p-4 text-fg shadow-2xl"
+        className="w-[28rem] rounded-xl border border-border/15 bg-card p-4 text-fg shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center gap-2">

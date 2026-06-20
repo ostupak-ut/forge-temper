@@ -1,6 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { ReactFlowProvider } from '@xyflow/react'
-import { Anvil, FolderTree, Moon, PanelRightOpen, Settings as SettingsIcon, Sun, Thermometer } from 'lucide-react'
+import { Anvil, FolderTree, Moon, PanelRightOpen, Settings as SettingsIcon, Sun } from 'lucide-react'
 import { FlowCanvas } from '@/canvas/FlowCanvas'
 import { Palette } from '@/panels/Palette'
 import { Inspector } from '@/panels/Inspector'
@@ -73,9 +73,6 @@ export function App() {
           <div className="flex items-center gap-1.5 font-semibold tracking-tight">
             <Anvil className="size-5 text-forge" />
             <span>Forge</span>
-            <span className="text-fg/30">·</span>
-            <Thermometer className="size-5 text-temper" />
-            <span>Temper</span>
           </div>
           <span className="text-sm text-fg/40">Visual Flow Modeller</span>
           <div className="ml-auto flex items-center gap-3 text-xs">
@@ -122,7 +119,7 @@ export function App() {
           >
             <SettingsIcon className="size-3.5" /> Settings
           </button>
-          <span className="ml-auto text-[10px] text-fg/25">forge · temper</span>
+          <span className="ml-auto text-[10px] text-fg/25">forge</span>
         </div>
 
         {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}

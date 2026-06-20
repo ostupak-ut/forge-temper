@@ -290,7 +290,7 @@ function EdgeInspector({
           </>
         ) : (
           <p className="text-[11px] leading-tight text-fg/35">
-            A data connection. Select the Temper→Forge feedback arrow to configure the loop.
+            A data connection — it carries the source node’s output into this input. (Click the dashed rose loop arrow for loop settings.)
           </p>
         )}
       </div>

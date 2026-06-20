@@ -96,7 +96,7 @@ export function Palette() {
       )}
 
       <p className="px-1 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-fg/30">Nodes</p>
-      {ALL_KINDS.map((kind) => {
+      {ALL_KINDS.filter((kind) => kind !== 'custom').map((kind) => {
         const spec = getSpec(kind)
         const Icon = spec.icon
         return (
