@@ -1,14 +1,42 @@
 import type { FastifyInstance } from 'fastify'
-import { getKey, keyPresence, setKeys, type ProviderKey } from '../persistence/settingsStore'
+import {
+  getKey,
+  getWorkspaceSetting,
+  keyPresence,
+  setKeys,
+  setWorkspaceSetting,
+  type ProviderKey,
+} from '../persistence/settingsStore'
+import { DEFAULT_WORKSPACE_DIR, getWorkspaceDir } from '../config'
 
 export async function settingsRoutes(app: FastifyInstance) {
   // Presence booleans only — never return secret values.
-  app.get('/api/settings', async () => ({ keys: keyPresence() }))
+  app.get('/api/settings', async () => ({
+    keys: keyPresence(),
+    workspaceDir: getWorkspaceDir(),
+    workspaceOverride: getWorkspaceSetting(),
+    defaultWorkspaceDir: DEFAULT_WORKSPACE_DIR,
+  }))
 
   app.post('/api/settings', async (req) => {
-    const body = (req.body ?? {}) as Partial<Record<ProviderKey, string>>
-    setKeys(body)
-    return { ok: true, keys: keyPresence() }
+    const body = (req.body ?? {}) as Partial<Record<ProviderKey, string>> & { workspaceDir?: unknown }
+    if ('workspaceDir' in body) {
+      const wd = body.workspaceDir
+      // Reject empty: clearing (revert to default) requires an explicit null.
+      if (wd !== null && (typeof wd !== 'string' || !wd.trim())) {
+        return { ok: false, error: 'workspaceDir must be a non-empty absolute path (or null to reset)' }
+      }
+      setWorkspaceSetting(wd === null ? null : (wd as string))
+    }
+    const { workspaceDir: _wd, ...keyBody } = body
+    setKeys(keyBody as Partial<Record<ProviderKey, string>>)
+    return {
+      ok: true,
+      keys: keyPresence(),
+      workspaceDir: getWorkspaceDir(),
+      workspaceOverride: getWorkspaceSetting(),
+      defaultWorkspaceDir: DEFAULT_WORKSPACE_DIR,
+    }
   })
 
   // Server-side proxy for OpenRouter's model list (public endpoint; key optional).

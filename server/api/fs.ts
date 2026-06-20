@@ -2,11 +2,11 @@ import type { FastifyInstance } from 'fastify'
 import { createReadStream } from 'node:fs'
 import { mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { WORKSPACE_DIR } from '../config'
+import { getWorkspaceDir } from '../config'
 
 /** Resolve a workspace-relative path, refusing anything that escapes the root. */
 function safeResolve(rel: string): string | null {
-  const root = path.resolve(WORKSPACE_DIR)
+  const root = path.resolve(getWorkspaceDir())
   const target = path.resolve(root, rel || '.')
   if (target !== root && !target.startsWith(root + path.sep)) return null
   return target
@@ -52,17 +52,17 @@ export async function fsRoutes(app: FastifyInstance) {
           return {
             name: e.name,
             dir: e.isDirectory(),
-            rel: path.relative(WORKSPACE_DIR, full).split(path.sep).join('/'),
+            rel: path.relative(getWorkspaceDir(), full).split(path.sep).join('/'),
             size,
           }
         }),
       )
       items.sort((a, b) => (a.dir === b.dir ? a.name.localeCompare(b.name) : a.dir ? -1 : 1))
-      return { root: path.basename(WORKSPACE_DIR), path: rel, items }
+      return { root: path.basename(getWorkspaceDir()), path: rel, items }
     } catch (e) {
       // A not-yet-created dir (e.g. library/ before first upload) = empty, not an error.
       if ((e as NodeJS.ErrnoException)?.code === 'ENOENT') {
-        return { root: path.basename(WORKSPACE_DIR), path: rel, items: [] as FsEntry[] }
+        return { root: path.basename(getWorkspaceDir()), path: rel, items: [] as FsEntry[] }
       }
       return reply.code(404).send({ error: String((e as Error)?.message ?? e) })
     }
@@ -106,7 +106,7 @@ export async function fsRoutes(app: FastifyInstance) {
     const rel = String((req.query as { path?: string }).path ?? '').trim()
     const target = safeResolve(rel)
     if (!target || !rel) return reply.code(400).send({ error: 'invalid path' })
-    if (target === path.resolve(WORKSPACE_DIR)) return reply.code(400).send({ error: 'refusing to delete workspace root' })
+    if (target === path.resolve(getWorkspaceDir())) return reply.code(400).send({ error: 'refusing to delete workspace root' })
     try {
       await rm(target, { recursive: true, force: true })
       return { ok: true }

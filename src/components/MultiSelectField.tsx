@@ -23,8 +23,8 @@ export function MultiSelectField({
             className={
               'flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 text-xs transition ' +
               (on
-                ? 'border-temper/50 bg-temper/15 text-white/90'
-                : 'border-white/10 bg-black/30 text-white/55 hover:border-white/20')
+                ? 'border-temper/50 bg-temper/15 text-fg/90'
+                : 'border-border/10 bg-field text-fg/55 hover:border-border/20')
             }
           >
             <input

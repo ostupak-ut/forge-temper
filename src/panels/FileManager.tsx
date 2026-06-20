@@ -87,16 +87,16 @@ export function FileManager({ onClose }: { onClose: () => void }) {
   const crumbs = path ? path.split('/') : []
 
   return (
-    <div className="flex h-64 shrink-0 flex-col border-t border-white/10 bg-[#0d1320]">
-      <div className="flex items-center gap-2 border-b border-white/10 px-3 py-1.5 text-xs">
-        <span className="font-semibold text-white/60">Library</span>
-        <button onClick={() => setPath('')} className="text-white/40 hover:text-white/80">
+    <div className="flex h-64 shrink-0 flex-col border-t border-border/10 bg-surface">
+      <div className="flex items-center gap-2 border-b border-border/10 px-3 py-1.5 text-xs">
+        <span className="font-semibold text-fg/60">Library</span>
+        <button onClick={() => setPath('')} className="text-fg/40 hover:text-fg/80">
           workspace
         </button>
         {crumbs.map((c, i) => (
-          <span key={i} className="flex items-center gap-1 text-white/40">
+          <span key={i} className="flex items-center gap-1 text-fg/40">
             <ChevronRight className="size-3" />
-            <button onClick={() => setPath(crumbs.slice(0, i + 1).join('/'))} className="hover:text-white/80">
+            <button onClick={() => setPath(crumbs.slice(0, i + 1).join('/'))} className="hover:text-fg/80">
               {c}
             </button>
           </span>
@@ -104,35 +104,35 @@ export function FileManager({ onClose }: { onClose: () => void }) {
         <button
           onClick={() => filesRef.current?.click()}
           disabled={busy}
-          className="ml-auto flex items-center gap-1 rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-white/70 hover:bg-white/10 disabled:opacity-50"
+          className="ml-auto flex items-center gap-1 rounded border border-border/10 bg-fg/5 px-2 py-0.5 text-[11px] text-fg/70 hover:bg-fg/10 disabled:opacity-50"
         >
           <Upload className="size-3" /> {busy ? '…' : 'Upload'}
         </button>
         <button
           onClick={() => folderRef.current?.click()}
           disabled={busy}
-          className="flex items-center gap-1 rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-white/70 hover:bg-white/10 disabled:opacity-50"
+          className="flex items-center gap-1 rounded border border-border/10 bg-fg/5 px-2 py-0.5 text-[11px] text-fg/70 hover:bg-fg/10 disabled:opacity-50"
         >
           <FolderPlus className="size-3" /> Folder
         </button>
-        <button onClick={() => load(path)} className="rounded p-1 hover:bg-white/10" title="Refresh">
-          <RefreshCw className="size-3.5 text-white/40" />
+        <button onClick={() => load(path)} className="rounded p-1 hover:bg-fg/10" title="Refresh">
+          <RefreshCw className="size-3.5 text-fg/40" />
         </button>
-        <button onClick={onClose} className="rounded p-1 hover:bg-white/10" title="Close">
-          <X className="size-3.5 text-white/40" />
+        <button onClick={onClose} className="rounded p-1 hover:bg-fg/10" title="Close">
+          <X className="size-3.5 text-fg/40" />
         </button>
       </div>
 
       <div className="flex min-h-0 flex-1">
-        <div className="w-1/3 overflow-auto border-r border-white/10 p-1">
+        <div className="w-1/3 overflow-auto border-r border-border/10 p-1">
           {error && <p className="p-2 text-[11px] text-red-400">{error}</p>}
           {!error && items.length === 0 && (
-            <p className="p-2 text-[11px] text-white/30">empty — Upload files or a Folder above.</p>
+            <p className="p-2 text-[11px] text-fg/30">empty — Upload files or a Folder above.</p>
           )}
           {items.map((it) => (
             <div
               key={it.rel}
-              className="group flex items-center gap-2 rounded px-2 py-1 text-[11px] text-white/70 hover:bg-white/10"
+              className="group flex items-center gap-2 rounded px-2 py-1 text-[11px] text-fg/70 hover:bg-fg/10"
             >
               <button
                 onClick={() => (it.dir ? setPath(it.rel) : setPreview({ rel: it.rel, ext: extOf(it.name) }))}
@@ -141,15 +141,15 @@ export function FileManager({ onClose }: { onClose: () => void }) {
                 {it.dir ? (
                   <Folder className="size-3.5 shrink-0 text-amber-300/80" />
                 ) : (
-                  <FileIcon className="size-3.5 shrink-0 text-white/40" />
+                  <FileIcon className="size-3.5 shrink-0 text-fg/40" />
                 )}
                 <span className="truncate">{it.name}</span>
-                {!it.dir && <span className="ml-auto text-white/25">{(it.size / 1024).toFixed(0)}k</span>}
+                {!it.dir && <span className="ml-auto text-fg/25">{(it.size / 1024).toFixed(0)}k</span>}
               </button>
               <button
                 onClick={(e) => del(e, it.rel)}
                 title="Delete"
-                className="rounded p-0.5 text-white/20 opacity-0 hover:bg-red-500/20 hover:text-red-300 group-hover:opacity-100"
+                className="rounded p-0.5 text-fg/20 opacity-0 hover:bg-red-500/20 hover:text-red-300 group-hover:opacity-100"
               >
                 <Trash2 className="size-3" />
               </button>
@@ -158,7 +158,7 @@ export function FileManager({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="min-w-0 flex-1 overflow-auto">
-          {!preview && <p className="p-3 text-[11px] text-white/30">Select a file to preview.</p>}
+          {!preview && <p className="p-3 text-[11px] text-fg/30">Select a file to preview.</p>}
           {preview?.ext === '.pdf' && (
             <iframe
               title={preview.rel}
@@ -170,7 +170,7 @@ export function FileManager({ onClose }: { onClose: () => void }) {
             <img src={`/api/fs/raw?path=${encodeURIComponent(preview.rel)}`} alt={preview.rel} className="max-w-full" />
           )}
           {preview && TEXT_EXT.includes(preview.ext) && (
-            <pre className="whitespace-pre-wrap p-3 font-mono text-[11px] leading-snug text-white/70">{text}</pre>
+            <pre className="whitespace-pre-wrap p-3 font-mono text-[11px] leading-snug text-fg/70">{text}</pre>
           )}
         </div>
       </div>

@@ -9,17 +9,52 @@ body,
   margin: 0;
 }
 
-/* Render native controls (select dropdowns, their highlight, scrollbars) in
-   dark mode — fixes the unreadable/“wrong option highlighted” select dropdown. */
+/* Theme tokens as space-separated RGB channels so Tailwind opacity works.
+   Render native controls (select dropdowns, their highlight, scrollbars) per
+   theme — fixes the unreadable/“wrong option highlighted” select dropdown. */
 :root {
+  --bg: 11 15 23;
+  --surface: 13 19 32;
+  --card: 18 24 38;
+  --field: 6 10 18;
+  --fg: 229 231 235;
+  --border: 148 163 184;
+  --grid: 30 41 59;
   color-scheme: dark;
 }
+
+/* Light mode — Financial Times "pink paper" pastel palette (warm cream, not stark white). */
+html.light {
+  --bg: 255 241 229;     /* FT paper #fff1e5 */
+  --surface: 255 247 238; /* panels — slightly lighter warm */
+  --card: 255 250 244;    /* nodes — warm near-white (never pure #fff) */
+  --field: 245 235 224;   /* inputs — recessed warm */
+  --fg: 38 37 35;         /* warm near-black ink */
+  --border: 51 47 43;     /* warm charcoal (used at low opacity) */
+  --grid: 226 214 200;    /* warm dot grid */
+  color-scheme: light;
+}
+
+/* Accent text shades are tuned for dark backgrounds; in light mode they're too
+   faint on light tints, so darken them centrally (no per-button edits). */
+html.light .text-emerald-200,
+html.light .text-emerald-300 { color: rgb(4 120 87); }
+html.light .text-red-200,
+html.light .text-red-300 { color: rgb(185 28 28); }
+html.light .text-amber-200,
+html.light .text-amber-300 { color: rgb(180 83 9); }
+html.light .text-sky-300,
+html.light .text-sky-400 { color: rgb(2 132 199); }
+html.light .text-rose-100,
+html.light .text-rose-200 { color: rgb(190 18 60); }
+html.light .text-temper { color: rgb(21 101 152); }
+html.light .text-forge { color: rgb(180 83 9); }
 
 body {
   font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
-  background: #0b0f17;
-  color: #e5e7eb;
+  background: rgb(var(--bg));
+  color: rgb(var(--fg));
 }
 
 /* marching-ants for the active Temper→Forge feedback edge */

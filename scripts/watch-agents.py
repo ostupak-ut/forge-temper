@@ -13,7 +13,7 @@ Keys (when run in a real terminal):
 Whip fast for COMBO streaks. The whip is motivational only — agents run at the
 same speed whipped or not. Morale, however, is priceless.
 """
-import json, glob, os, time, sys, select, random, subprocess
+import json, glob, os, time, sys, select, random, subprocess, math, struct, wave, tempfile
 from collections import defaultdict, deque
 
 BASE = os.path.expanduser("~/.claude/projects/-Users-Oleh-Documents-papers-forge-temper")
@@ -46,21 +46,47 @@ SIGS = [
     ("A · custom-ui",    ("src/panels", "src/components", "src/edges", "src/registry", "src/canvas", "src/nodes")),
 ]
 KEYMAP = {"a": "A · custom-ui", "b": "B · harness", "c": "C · bundle+latex", "d": "D · cycle-engine"}
-SOUNDS = ["/System/Library/Sounds/Pop.aiff", "/System/Library/Sounds/Tink.aiff", "/System/Library/Sounds/Morse.aiff"]
+SOUNDS = ["/System/Library/Sounds/Pop.aiff", "/System/Library/Sounds/Tink.aiff"]
 SOUND = next((s for s in SOUNDS if os.path.exists(s)), None)
+WHIP_WAV = os.path.join(tempfile.gettempdir(), "ft-whipcrack.wav")
+
+
+def ensure_whip():
+    """Synthesize a real whip-crack WAV (rising swish → sharp broadband crack)
+    once — macOS has no whip sound and no sox, so we build one from stdlib."""
+    if os.path.exists(WHIP_WAV):
+        return WHIP_WAV
+    try:
+        sr, dur, crack_at = 44100, 0.20, 0.045
+        frames = bytearray()
+        prev = 0.0
+        for i in range(int(sr * dur)):
+            t = i / sr
+            if t < crack_at:                         # swish (rising noise ramp)
+                s = (random.random() * 2 - 1) * 0.30 * (t / crack_at) ** 2
+            else:                                    # crack (fast exp-decay burst)
+                s = (random.random() * 2 - 1) * math.exp(-(t - crack_at) / 0.028)
+            hp = s - 0.9 * prev                      # high-pass → crisp snap
+            prev = s
+            v = max(-1.0, min(1.0, hp * 1.3))
+            frames += struct.pack("<h", int(v * 30000))
+        w = wave.open(WHIP_WAV, "w")
+        w.setnchannels(1); w.setsampwidth(2); w.setframerate(sr)
+        w.writeframes(bytes(frames)); w.close()
+        return WHIP_WAV
+    except Exception:
+        return None
 
 
 def crack_sound(muted, combo):
     if muted:
         return
-    if SOUND:
+    target = ensure_whip() or SOUND
+    if target:
         try:
-            vol = min(3.0, 0.8 + combo * 0.25)
-            subprocess.Popen(["afplay", "-v", f"{vol:.2f}", SOUND],
+            vol = min(4.0, 1.2 + combo * 0.3)
+            subprocess.Popen(["afplay", "-v", f"{vol:.2f}", target],
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            if combo >= 5:  # double-tap = sharper crack
-                subprocess.Popen(["afplay", "-v", f"{vol:.2f}", SOUND],
-                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except Exception:
             pass
     sys.stdout.write("\a"); sys.stdout.flush()

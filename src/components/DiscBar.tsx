@@ -12,7 +12,7 @@ export function DiscBar({ tally, allCorrect }: { tally: DiscTally; allCorrect?: 
   const total = tally.v + tally.p + tally.h + tally.c
   if (total === 0) return null
   return (
-    <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-white/60">
+    <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-fg/60">
       {DISCS.filter((d) => tally[d.key] > 0).map((d) => (
         <span key={d.key} className="flex items-center gap-0.5" title={`${tally[d.key]} ${d.label}`}>
           <span className="inline-block size-2 rounded-full" style={{ background: d.color }} />

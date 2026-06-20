@@ -32,7 +32,7 @@ function topoOrder(nodes: FtNode[], allEdges: Edge[]): string[] {
 
 const CURRENT_KEY = 'ft.currentFlow'
 const btn =
-  'flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] px-2.5 py-1 text-xs text-white/80 transition hover:border-white/25 hover:bg-white/[0.08] disabled:opacity-40'
+  'flex items-center gap-1.5 rounded-md border border-border/10 bg-field px-2.5 py-1 text-xs text-fg/80 transition hover:border-border/25 hover:bg-fg/[0.08] disabled:opacity-40'
 
 export function Toolbar() {
   const setGraph = useGraphStore((s) => s.setGraph)
@@ -121,7 +121,7 @@ export function Toolbar() {
   }
 
   return (
-    <div className="flex items-center gap-2 border-b border-white/10 bg-black/20 px-3 py-1.5">
+    <div className="flex items-center gap-2 border-b border-border/10 bg-field px-3 py-1.5">
       <button className={btn} onClick={onNew} title="New empty flow">
         <FilePlus2 className="size-3.5" /> New
       </button>
@@ -138,14 +138,14 @@ export function Toolbar() {
       </button>
 
       <select
-        className="max-w-44 rounded-md border border-white/10 bg-black/30 px-2 py-1 text-xs text-white/80 outline-none"
+        className="max-w-44 rounded-md border border-border/10 bg-field px-2 py-1 text-xs text-fg/80 outline-none"
         value={current ?? ''}
         onChange={(e) => onOpen(e.target.value)}
         title="Open a saved flow"
       >
         <option value="">{flows.length ? 'open flow…' : 'no saved flows'}</option>
         {flows.map((f) => (
-          <option key={f.name} value={f.name} className="bg-[#121826]">
+          <option key={f.name} value={f.name} className="bg-card">
             {f.name}
           </option>
         ))}
@@ -161,8 +161,8 @@ export function Toolbar() {
         <Trash2 className="size-3.5" />
       </button>
 
-      <span className="ml-1 text-[11px] text-white/40">
-        {current ? <span className="text-white/70">{current}</span> : <span className="italic">unsaved</span>}
+      <span className="ml-1 text-[11px] text-fg/40">
+        {current ? <span className="text-fg/70">{current}</span> : <span className="italic">unsaved</span>}
         {dirtyMsg && <span className="ml-2 text-emerald-300">{dirtyMsg}</span>}
       </span>
 

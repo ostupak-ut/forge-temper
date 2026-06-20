@@ -38,7 +38,7 @@ function pushHistory(nodeId: string, value: string) {
 
 const cmTheme = EditorView.theme({
   '&': { fontSize: '12px', backgroundColor: 'transparent' },
-  '.cm-content': { fontFamily: 'ui-monospace, monospace', color: '#d1d5db' },
+  '.cm-content': { fontFamily: 'ui-monospace, monospace', color: 'rgb(var(--fg))' },
   '.cm-gutters': { display: 'none' },
   '&.cm-focused': { outline: 'none' },
 })
@@ -87,38 +87,38 @@ export function PromptEditor({
   }
 
   return (
-    <div className="rounded-lg border border-white/10 bg-black/30">
-      <div className="flex flex-wrap items-center gap-1 border-b border-white/10 px-1.5 py-1">
-        <Variable className="size-3 text-white/30" />
+    <div className="rounded-lg border border-border/10 bg-field">
+      <div className="flex flex-wrap items-center gap-1 border-b border-border/10 px-1.5 py-1">
+        <Variable className="size-3 text-fg/30" />
         {allVars.map((v) => (
           <button
             key={v}
             onClick={() => insertVar(v)}
-            className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-temper hover:bg-white/10"
+            className="rounded bg-fg/5 px-1.5 py-0.5 text-[10px] text-temper hover:bg-fg/10"
             title={`Insert {{${v}}}`}
           >
             {v}
           </button>
         ))}
         <div className="ml-auto flex items-center gap-1">
-          <button onClick={() => setShowHistory((s) => !s)} title="History" className="rounded p-1 hover:bg-white/10">
-            <History className="size-3 text-white/40" />
+          <button onClick={() => setShowHistory((s) => !s)} title="History" className="rounded p-1 hover:bg-fg/10">
+            <History className="size-3 text-fg/40" />
           </button>
-          <button onClick={saveAsPreset} title="Save as preset" className="rounded p-1 hover:bg-white/10">
-            <Save className="size-3 text-white/40" />
+          <button onClick={saveAsPreset} title="Save as preset" className="rounded p-1 hover:bg-fg/10">
+            <Save className="size-3 text-fg/40" />
           </button>
         </div>
       </div>
 
       {Object.keys(presets).length > 0 && (
         <select
-          className="w-full bg-transparent px-2 py-1 text-[11px] text-white/60 outline-none"
+          className="w-full bg-transparent px-2 py-1 text-[11px] text-fg/60 outline-none"
           value=""
           onChange={(e) => e.target.value && applyPreset(e.target.value)}
         >
           <option value="">apply preset…</option>
           {Object.keys(presets).map((n) => (
-            <option key={n} value={n} className="bg-[#121826]">
+            <option key={n} value={n} className="bg-card">
               {n}
             </option>
           ))}
@@ -126,13 +126,13 @@ export function PromptEditor({
       )}
 
       {showHistory && (
-        <div className="max-h-28 overflow-auto border-b border-white/10 bg-black/40 p-1">
-          {history.length === 0 && <p className="px-1 text-[10px] text-white/30">no history yet</p>}
+        <div className="max-h-28 overflow-auto border-b border-border/10 bg-field p-1">
+          {history.length === 0 && <p className="px-1 text-[10px] text-fg/30">no history yet</p>}
           {history.map((h, i) => (
             <button
               key={i}
               onClick={() => onChange(h)}
-              className="block w-full truncate rounded px-1 py-0.5 text-left text-[10px] text-white/50 hover:bg-white/10"
+              className="block w-full truncate rounded px-1 py-0.5 text-left text-[10px] text-fg/50 hover:bg-fg/10"
               title={h}
             >
               {h.slice(0, 80) || '(empty)'}

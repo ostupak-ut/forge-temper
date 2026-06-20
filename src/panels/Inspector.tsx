@@ -30,16 +30,16 @@ import { MultiSelectField } from '@/components/MultiSelectField'
 import { PromptEditor } from './PromptEditor'
 
 const STATUS_PILL: Record<NodeRunStatus, string> = {
-  idle: 'bg-white/10 text-white/50',
+  idle: 'bg-fg/10 text-fg/50',
   queued: 'bg-amber-400/20 text-amber-300',
   running: 'bg-temper/20 text-temper',
   done: 'bg-emerald-400/20 text-emerald-300',
   error: 'bg-red-500/20 text-red-300',
-  skipped: 'bg-white/5 text-white/30',
+  skipped: 'bg-fg/5 text-fg/30',
 }
 
 const inputCls =
-  'w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-xs text-white/90 outline-none focus:border-temper'
+  'w-full rounded-md border border-border/10 bg-field px-2 py-1 text-xs text-fg/90 outline-none focus:border-temper'
 
 /** Path field with a "Choose file…" button (OS dialog → uploads into the workspace). */
 function FilePathField({
@@ -84,7 +84,7 @@ function FilePathField({
         onClick={() => ref.current?.click()}
         disabled={busy}
         title="Choose a file from your computer"
-        className="flex shrink-0 items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 text-xs text-white/70 hover:bg-white/10 disabled:opacity-50"
+        className="flex shrink-0 items-center gap-1 rounded-md border border-border/10 bg-fg/5 px-2 text-xs text-fg/70 hover:bg-fg/10 disabled:opacity-50"
       >
         <Upload className="size-3" />
         {busy ? '…' : 'Choose'}
@@ -115,7 +115,7 @@ function ModelField({
     return (
       <select className={inputCls} value={value} onChange={(e) => onChange(e.target.value)}>
         {options.map((o) => (
-          <option key={o.value} value={o.value} className="bg-[#121826]">
+          <option key={o.value} value={o.value} className="bg-card">
             {o.label}
           </option>
         ))}
@@ -160,7 +160,7 @@ function IconField({ value, onChange }: { value: string; onChange: (v: string) =
               'grid aspect-square place-items-center rounded-md border transition ' +
               (active
                 ? 'border-temper bg-temper/15 text-temper'
-                : 'border-white/10 bg-white/5 text-white/55 hover:bg-white/10 hover:text-white/80')
+                : 'border-border/10 bg-fg/5 text-fg/55 hover:bg-fg/10 hover:text-fg/80')
             }
           >
             <I className="size-4" />
@@ -189,9 +189,9 @@ function NodeOutput({ protoDir }: { protoDir: string }) {
 
   if (files.length === 0) return null
   return (
-    <div className="mt-1.5 border-t border-white/10 pt-1.5">
+    <div className="mt-1.5 border-t border-border/10 pt-1.5">
       <div className="mb-1 flex items-center justify-between">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-white/30">Output</span>
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-fg/30">Output</span>
         {pdf && (
           <a href={raw(pdf.rel)} target="_blank" rel="noreferrer" className="text-[10px] text-temper hover:underline">
             open full ↗
@@ -199,7 +199,7 @@ function NodeOutput({ protoDir }: { protoDir: string }) {
         )}
       </div>
       {pdf && (
-        <iframe title="paper" src={raw(pdf.rel)} className="h-72 w-full rounded border border-white/10 bg-white" />
+        <iframe title="paper" src={raw(pdf.rel)} className="h-72 w-full rounded border border-border/10 bg-white" />
       )}
       {docs.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-1">
@@ -209,7 +209,7 @@ function NodeOutput({ protoDir }: { protoDir: string }) {
               href={raw(f.rel)}
               target="_blank"
               rel="noreferrer"
-              className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-white/55 hover:bg-white/10"
+              className="rounded bg-fg/5 px-1.5 py-0.5 text-[10px] text-fg/55 hover:bg-fg/10"
             >
               {f.name}
             </a>
@@ -235,19 +235,19 @@ function EdgeInspector({
   const isLoop = edge.type === 'feedback' || Boolean((edge.data as { loopBackEdge?: unknown })?.loopBackEdge)
   const data = (edge.data ?? {}) as { mode?: string; maxIterations?: number }
   return (
-    <div className="flex h-full w-80 shrink-0 flex-col border-l border-white/10 bg-[#0d1320]">
-      <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2">
+    <div className="flex h-full w-80 shrink-0 flex-col border-l border-border/10 bg-surface">
+      <div className="flex items-center gap-2 border-b border-border/10 px-3 py-2">
         <Repeat className="size-4 text-rose-400" />
-        <span className="flex-1 text-sm font-medium text-white/90">{isLoop ? 'Loop' : 'Connection'}</span>
+        <span className="flex-1 text-sm font-medium text-fg/90">{isLoop ? 'Loop' : 'Connection'}</span>
         <button
           onClick={onDelete}
           title={isLoop ? 'Remove the loop (delete this arrow)' : 'Delete this edge'}
-          className="rounded p-1 text-white/40 hover:bg-red-500/20 hover:text-red-300"
+          className="rounded p-1 text-fg/40 hover:bg-red-500/20 hover:text-red-300"
         >
           <Trash2 className="size-4" />
         </button>
         {onClose && (
-          <button onClick={onClose} title="Close panel" className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white/80">
+          <button onClick={onClose} title="Close panel" className="rounded p-1 text-fg/40 hover:bg-fg/10 hover:text-fg/80">
             <PanelRightClose className="size-4" />
           </button>
         )}
@@ -255,27 +255,27 @@ function EdgeInspector({
       <div className="flex-1 space-y-4 overflow-auto p-3">
         {isLoop ? (
           <>
-            <p className="text-[11px] leading-tight text-white/35">
+            <p className="text-[11px] leading-tight text-fg/35">
               This arrow is the loop: Temper’s verdict flows back into Forge each iteration until all results are
               correct or the cap is hit.
             </p>
             <div className="space-y-1">
-              <label className="block text-[11px] text-white/55">Mode</label>
+              <label className="block text-[11px] text-fg/55">Mode</label>
               <select
                 className={inputCls}
                 value={data.mode ?? 'until-pass'}
                 onChange={(e) => updateEdgeData(edge.id, { mode: e.target.value })}
               >
-                <option value="until-pass" className="bg-[#121826]">
+                <option value="until-pass" className="bg-card">
                   Until pass (smart: temper all-correct)
                 </option>
-                <option value="until-count" className="bg-[#121826]">
+                <option value="until-count" className="bg-card">
                   Until count (fixed iterations)
                 </option>
               </select>
             </div>
             <div className="space-y-1">
-              <label className="block text-[11px] text-white/55">Max iterations</label>
+              <label className="block text-[11px] text-fg/55">Max iterations</label>
               <input
                 type="number"
                 className={inputCls}
@@ -285,11 +285,11 @@ function EdgeInspector({
                 value={Number(data.maxIterations ?? 3)}
                 onChange={(e) => updateEdgeData(edge.id, { maxIterations: e.target.value === '' ? '' : Number(e.target.value) })}
               />
-              <p className="text-[10px] leading-tight text-white/25">Always a hard cap, even in smart mode.</p>
+              <p className="text-[10px] leading-tight text-fg/25">Always a hard cap, even in smart mode.</p>
             </div>
           </>
         ) : (
-          <p className="text-[11px] leading-tight text-white/35">
+          <p className="text-[11px] leading-tight text-fg/35">
             A data connection. Select the Temper→Forge feedback arrow to configure the loop.
           </p>
         )}
@@ -312,7 +312,7 @@ function ColorField({ value, onChange }: { value: string; onChange: (v: string) 
           key={c}
           onClick={() => onChange(c)}
           title={c}
-          className={'size-5 rounded-full border transition ' + (value === c ? 'border-white ring-2 ring-white/40' : 'border-white/20 hover:border-white/50')}
+          className={'size-5 rounded-full border transition ' + (value === c ? 'border-fg ring-2 ring-border/40' : 'border-border/20 hover:border-border/50')}
           style={{ background: c }}
         />
       ))}
@@ -321,7 +321,7 @@ function ColorField({ value, onChange }: { value: string; onChange: (v: string) 
         value={/^#[0-9a-f]{6}$/i.test(value) ? value : '#22d3ee'}
         onChange={(e) => onChange(e.target.value)}
         title="Custom color"
-        className="ml-1 size-6 cursor-pointer rounded border border-white/20 bg-transparent"
+        className="ml-1 size-6 cursor-pointer rounded border border-border/20 bg-transparent"
       />
     </div>
   )
@@ -345,35 +345,35 @@ function LibraryPicker({ onAdd, onClose }: { onAdd: (p: string) => void; onClose
   }, [dir])
   const crumbs = dir.split('/').filter(Boolean)
   return (
-    <div className="mt-1 rounded-md border border-white/10 bg-black/40 p-2">
-      <div className="mb-1 flex items-center gap-1 text-[10px] text-white/45">
+    <div className="mt-1 rounded-md border border-border/10 bg-field p-2">
+      <div className="mb-1 flex items-center gap-1 text-[10px] text-fg/45">
         {crumbs.map((c, i) => (
-          <button key={i} className="hover:text-white/80" onClick={() => setDir(crumbs.slice(0, i + 1).join('/'))}>
+          <button key={i} className="hover:text-fg/80" onClick={() => setDir(crumbs.slice(0, i + 1).join('/'))}>
             {i > 0 ? '/ ' : ''}
             {c}
           </button>
         ))}
         <button
-          className="ml-auto rounded bg-white/10 px-1.5 py-0.5 hover:bg-white/20"
+          className="ml-auto rounded bg-fg/10 px-1.5 py-0.5 hover:bg-fg/20"
           title="Add this whole folder"
           onClick={() => onAdd(dir)}
         >
           + this folder
         </button>
-        <button className="rounded p-0.5 hover:bg-white/10" onClick={onClose} title="Close">
+        <button className="rounded p-0.5 hover:bg-fg/10" onClick={onClose} title="Close">
           <X className="size-3" />
         </button>
       </div>
       <div className="max-h-40 overflow-auto">
-        {items.length === 0 && <p className="px-1 py-2 text-[10px] text-white/30">empty — upload below</p>}
+        {items.length === 0 && <p className="px-1 py-2 text-[10px] text-fg/30">empty — upload below</p>}
         {items.map((it) => (
-          <div key={it.rel} className="flex items-center gap-2 rounded px-1.5 py-1 text-[11px] text-white/70 hover:bg-white/5">
-            {it.dir ? <Folder className="size-3.5 shrink-0 text-amber-300/80" /> : <FileIcon className="size-3.5 shrink-0 text-white/40" />}
+          <div key={it.rel} className="flex items-center gap-2 rounded px-1.5 py-1 text-[11px] text-fg/70 hover:bg-fg/5">
+            {it.dir ? <Folder className="size-3.5 shrink-0 text-amber-300/80" /> : <FileIcon className="size-3.5 shrink-0 text-fg/40" />}
             <button className="min-w-0 flex-1 truncate text-left" onClick={() => (it.dir ? setDir(it.rel) : onAdd(it.rel))}>
               {it.name}
             </button>
             <button
-              className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] hover:bg-white/10"
+              className="rounded bg-fg/5 px-1.5 py-0.5 text-[10px] hover:bg-fg/10"
               onClick={() => onAdd(it.rel)}
             >
               add
@@ -435,16 +435,16 @@ function FilesField({ value, onChange }: { value: string[]; onChange: (v: string
             return (
               <div
                 key={p}
-                className="flex items-center gap-2 rounded-md border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-white/75"
+                className="flex items-center gap-2 rounded-md border border-border/10 bg-field px-2 py-1 text-[11px] text-fg/75"
               >
                 {isFolder ? (
                   <Folder className="size-3.5 shrink-0 text-amber-300/80" />
                 ) : (
-                  <FileIcon className="size-3.5 shrink-0 text-white/40" />
+                  <FileIcon className="size-3.5 shrink-0 text-fg/40" />
                 )}
                 <span className="min-w-0 flex-1 truncate font-mono">{p.replace(/^library\//, '')}</span>
                 <button
-                  className="rounded p-0.5 text-white/30 hover:bg-red-500/20 hover:text-red-300"
+                  className="rounded p-0.5 text-fg/30 hover:bg-red-500/20 hover:text-red-300"
                   onClick={() => remove(p)}
                   title="Remove"
                 >
@@ -457,21 +457,21 @@ function FilesField({ value, onChange }: { value: string[]; onChange: (v: string
       )}
       <div className="flex flex-wrap gap-1">
         <button
-          className="flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/70 hover:bg-white/10 disabled:opacity-50"
+          className="flex items-center gap-1 rounded-md border border-border/10 bg-fg/5 px-2 py-1 text-[11px] text-fg/70 hover:bg-fg/10 disabled:opacity-50"
           onClick={() => filesRef.current?.click()}
           disabled={busy}
         >
           <Upload className="size-3" /> {busy ? '…' : 'Upload files'}
         </button>
         <button
-          className="flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/70 hover:bg-white/10 disabled:opacity-50"
+          className="flex items-center gap-1 rounded-md border border-border/10 bg-fg/5 px-2 py-1 text-[11px] text-fg/70 hover:bg-fg/10 disabled:opacity-50"
           onClick={() => folderRef.current?.click()}
           disabled={busy}
         >
           <FolderPlus className="size-3" /> Upload folder
         </button>
         <button
-          className="flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/70 hover:bg-white/10"
+          className="flex items-center gap-1 rounded-md border border-border/10 bg-fg/5 px-2 py-1 text-[11px] text-fg/70 hover:bg-fg/10"
           onClick={() => setPick((p) => !p)}
         >
           <Plus className="size-3" /> Library
@@ -518,22 +518,22 @@ function WarehouseGallery({ nodeId }: { nodeId: string }) {
   const raw = (rel: string) => `/api/fs/raw?path=${encodeURIComponent(rel)}`
   return (
     <div className="space-y-1.5">
-      <div className="flex items-center gap-2 text-[10px] text-white/45">
+      <div className="flex items-center gap-2 text-[10px] text-fg/45">
         <span>
           {runs.length} run{runs.length === 1 ? '' : 's'} piled
         </span>
-        <button onClick={reload} className="ml-auto rounded p-0.5 hover:bg-white/10" title="Refresh">
+        <button onClick={reload} className="ml-auto rounded p-0.5 hover:bg-fg/10" title="Refresh">
           <RefreshCw className="size-3" />
         </button>
       </div>
       {runs.length === 0 && (
-        <p className="text-[10px] text-white/30">No results yet — run the graph; each run adds a folder here.</p>
+        <p className="text-[10px] text-fg/30">No results yet — run the graph; each run adds a folder here.</p>
       )}
       <div className="space-y-1">
         {runs.map((r) => (
-          <div key={r.rel} className="rounded-md border border-white/10 bg-black/30">
+          <div key={r.rel} className="rounded-md border border-border/10 bg-field">
             <button
-              className="flex w-full items-center gap-2 px-2 py-1 text-left text-[11px] text-white/75 hover:bg-white/5"
+              className="flex w-full items-center gap-2 px-2 py-1 text-left text-[11px] text-fg/75 hover:bg-fg/5"
               onClick={() => setOpenRun(openRun === r.rel ? null : r.rel)}
             >
               <Archive className="size-3.5 shrink-0 text-sky-400" />
@@ -541,15 +541,15 @@ function WarehouseGallery({ nodeId }: { nodeId: string }) {
               <ChevronRight className={'size-3 shrink-0 transition ' + (openRun === r.rel ? 'rotate-90' : '')} />
             </button>
             {openRun === r.rel && (
-              <div className="border-t border-white/10 p-1">
-                {files.length === 0 && <p className="px-1 py-1 text-[10px] text-white/30">empty</p>}
+              <div className="border-t border-border/10 p-1">
+                {files.length === 0 && <p className="px-1 py-1 text-[10px] text-fg/30">empty</p>}
                 {files.map((f) => (
                   <a
                     key={f.rel}
                     href={raw(f.rel)}
                     target="_blank"
                     rel="noreferrer"
-                    className="block truncate rounded px-1.5 py-0.5 text-[10px] text-sky-300/80 hover:bg-white/5 hover:underline"
+                    className="block truncate rounded px-1.5 py-0.5 text-[10px] text-sky-300/80 hover:bg-fg/5 hover:underline"
                   >
                     {f.name}
                   </a>
@@ -598,12 +598,12 @@ export function Inspector({ onClose }: { onClose?: () => void }) {
       )
     }
     return (
-      <div className="relative flex h-full w-80 shrink-0 items-center justify-center border-l border-white/10 bg-[#0d1320] p-4 text-center text-xs text-white/30">
+      <div className="relative flex h-full w-80 shrink-0 items-center justify-center border-l border-border/10 bg-surface p-4 text-center text-xs text-fg/30">
         {onClose && (
           <button
             onClick={onClose}
             title="Close panel"
-            className="absolute right-2 top-2 rounded p-1 text-white/40 hover:bg-white/10 hover:text-white/80"
+            className="absolute right-2 top-2 rounded p-1 text-fg/40 hover:bg-fg/10 hover:text-fg/80"
           >
             <PanelRightClose className="size-4" />
           </button>
@@ -664,7 +664,7 @@ export function Inspector({ onClose }: { onClose?: () => void }) {
         )
       case 'boolean':
         return (
-          <label className="flex items-center gap-2 text-xs text-white/70">
+          <label className="flex items-center gap-2 text-xs text-fg/70">
             <input type="checkbox" checked={!!value} onChange={(e) => set(e.target.checked)} />
             {f.help ?? 'enabled'}
           </label>
@@ -688,7 +688,7 @@ export function Inspector({ onClose }: { onClose?: () => void }) {
         return (
           <select className={inputCls} value={String(value ?? '')} onChange={(e) => set(e.target.value)}>
             {opts.map((o) => (
-              <option key={o.value} value={o.value} className="bg-[#121826]">
+              <option key={o.value} value={o.value} className="bg-card">
                 {o.label}
               </option>
             ))}
@@ -735,11 +735,11 @@ export function Inspector({ onClose }: { onClose?: () => void }) {
   }
 
   return (
-    <div className="flex h-full w-80 shrink-0 flex-col border-l border-white/10 bg-[#0d1320]">
-      <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2">
+    <div className="flex h-full w-80 shrink-0 flex-col border-l border-border/10 bg-surface">
+      <div className="flex items-center gap-2 border-b border-border/10 px-3 py-2">
         <Icon className="size-4" style={{ color: accent }} />
         <input
-          className="flex-1 bg-transparent text-sm font-medium text-white/90 outline-none"
+          className="flex-1 bg-transparent text-sm font-medium text-fg/90 outline-none"
           value={node.data.label}
           onChange={(e) => updateNodeLabel(selectedId, e.target.value)}
         />
@@ -781,28 +781,28 @@ export function Inspector({ onClose }: { onClose?: () => void }) {
         <button
           onClick={() => deleteNode(selectedId)}
           title="Delete node"
-          className="rounded p-1 text-white/40 hover:bg-red-500/20 hover:text-red-300"
+          className="rounded p-1 text-fg/40 hover:bg-red-500/20 hover:text-red-300"
         >
           <Trash2 className="size-4" />
         </button>
         {onClose && (
-          <button onClick={onClose} title="Close panel" className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white/80">
+          <button onClick={onClose} title="Close panel" className="rounded p-1 text-fg/40 hover:bg-fg/10 hover:text-fg/80">
             <PanelRightClose className="size-4" />
           </button>
         )}
       </div>
 
       <div className="flex-1 space-y-4 overflow-auto p-3">
-        <p className="text-[11px] leading-tight text-white/35">{spec.description}</p>
+        <p className="text-[11px] leading-tight text-fg/35">{spec.description}</p>
 
         {run && (
-          <div className="rounded-lg border border-white/10 bg-black/30 p-2 text-[11px]">
+          <div className="rounded-lg border border-border/10 bg-field p-2 text-[11px]">
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-white/60">Run</span>
+              <span className="font-semibold text-fg/60">Run</span>
               <span className={'rounded px-1.5 py-0.5 text-[10px] ' + STATUS_PILL[run.status]}>{run.status}</span>
               {run.costUsd != null && (
                 <span
-                  className="ml-auto text-white/40"
+                  className="ml-auto text-fg/40"
                   title="API-rate estimate. On a Claude subscription this is not billed — it counts against your plan usage."
                 >
                   ~${run.costUsd.toFixed(4)} est.
@@ -810,14 +810,14 @@ export function Inspector({ onClose }: { onClose?: () => void }) {
               )}
             </div>
             {run.verdict && (
-              <div className="mt-1.5 border-t border-white/10 pt-1.5">
+              <div className="mt-1.5 border-t border-border/10 pt-1.5">
                 <DiscBar tally={run.verdict.distribution} allCorrect={run.verdict.allCorrect} />
-                <p className="mt-0.5 text-[10px] text-white/30">{run.verdict.results} results checked</p>
+                <p className="mt-0.5 text-[10px] text-fg/30">{run.verdict.results} results checked</p>
               </div>
             )}
             {run.error && <p className="mt-1 text-red-400">{run.error}</p>}
             {(run.result || run.tail) && (
-              <pre className="mt-1 max-h-52 overflow-auto whitespace-pre-wrap break-words text-[10px] leading-snug text-white/55">
+              <pre className="mt-1 max-h-52 overflow-auto whitespace-pre-wrap break-words text-[10px] leading-snug text-fg/55">
                 {run.result || run.tail}
               </pre>
             )}
@@ -834,13 +834,13 @@ export function Inspector({ onClose }: { onClose?: () => void }) {
 
         {[...groups.entries()].map(([group, fields]) => (
           <fieldset key={group} className="space-y-2">
-            <legend className="text-[10px] font-semibold uppercase tracking-wider text-white/30">{group}</legend>
+            <legend className="text-[10px] font-semibold uppercase tracking-wider text-fg/30">{group}</legend>
             {fields.map((f) => (
               <div key={f.key} className="space-y-1">
-                <label className="block text-[11px] text-white/55">{f.label}</label>
+                <label className="block text-[11px] text-fg/55">{f.label}</label>
                 {renderField(f)}
                 {f.help && f.kind !== 'boolean' && (
-                  <p className="text-[10px] leading-tight text-white/25">{f.help}</p>
+                  <p className="text-[10px] leading-tight text-fg/25">{f.help}</p>
                 )}
               </div>
             ))}

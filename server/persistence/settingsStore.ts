@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { DATA_DIR } from '../config'
+import { DATA_DIR, setWorkspaceDir } from '../config'
 
 export type ProviderKey = 'openrouter' | 'openai' | 'anthropic'
 
@@ -14,19 +14,29 @@ const ENV_VAR: Record<ProviderKey, string> = {
 mkdirSync(DATA_DIR, { recursive: true })
 
 let keys: Partial<Record<ProviderKey, string>> = {}
+let workspaceDir: string | null = null
+
+function persist() {
+  writeFileSync(FILE, JSON.stringify({ providerKeys: keys, workspaceDir }, null, 2), { mode: 0o600 })
+}
 
 function load() {
   if (existsSync(FILE)) {
     try {
-      keys = JSON.parse(readFileSync(FILE, 'utf8')).providerKeys ?? {}
+      const j = JSON.parse(readFileSync(FILE, 'utf8'))
+      keys = j.providerKeys ?? {}
+      workspaceDir = typeof j.workspaceDir === 'string' && j.workspaceDir.trim() ? j.workspaceDir : null
     } catch {
       keys = {}
+      workspaceDir = null
     }
   }
   // Merge into env so spawned children + fetch() inherit them.
   for (const p of Object.keys(ENV_VAR) as ProviderKey[]) {
     if (keys[p]) process.env[ENV_VAR[p]] = keys[p]
   }
+  // Apply the persisted workspace override (mkdirs it via config).
+  if (workspaceDir) setWorkspaceDir(workspaceDir)
 }
 load()
 
@@ -46,10 +56,26 @@ export function setKeys(partial: Partial<Record<ProviderKey, string>>) {
       process.env[ENV_VAR[pk]] = v.trim()
     }
   }
-  writeFileSync(FILE, JSON.stringify({ providerKeys: keys }, null, 2), { mode: 0o600 })
+  persist()
 }
 
 /** Presence booleans only — never expose secret values to the client. */
 export function keyPresence(): Record<ProviderKey, boolean> {
   return { openrouter: hasKey('openrouter'), openai: hasKey('openai'), anthropic: hasKey('anthropic') }
+}
+
+/** The persisted workspace override, or null when running on the default root. */
+export function getWorkspaceSetting(): string | null {
+  return workspaceDir
+}
+
+/**
+ * Persist a new workspace root (absolute path), apply it to config (which mkdirs
+ * it), and write it to settings.json. Pass null/empty to revert to the default.
+ */
+export function setWorkspaceSetting(dir: string | null): void {
+  const next = typeof dir === 'string' && dir.trim() ? path.resolve(dir.trim()) : null
+  workspaceDir = next
+  setWorkspaceDir(next)
+  persist()
 }

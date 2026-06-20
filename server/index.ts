@@ -3,7 +3,7 @@ import cors from '@fastify/cors'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { mkdir } from 'node:fs/promises'
-import { HOST, PORT, WORKSPACE_DIR } from './config'
+import { HOST, PORT, getWorkspaceDir } from './config'
 import { fsRoutes } from './api/fs'
 import { flowRoutes } from './api/flows'
 import { runRoutes } from './api/runs'
@@ -41,7 +41,7 @@ app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer' }, (_re
   done(null, body),
 )
 
-await mkdir(WORKSPACE_DIR, { recursive: true })
+await mkdir(getWorkspaceDir(), { recursive: true })
 await app.register(fsRoutes)
 await app.register(flowRoutes)
 await app.register(runRoutes)
@@ -53,7 +53,7 @@ app.get('/api/health', async () => {
   return {
     ok: true,
     service: 'forge-temper-server',
-    workspace: WORKSPACE_DIR,
+    workspace: getWorkspaceDir(),
     claude,
     // Availability per provider id — the UI lists only providers that can run.
     providers: {

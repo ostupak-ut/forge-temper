@@ -4,6 +4,14 @@ export default {
   theme: {
     extend: {
       colors: {
+        // theme tokens (space-separated RGB channels via CSS vars)
+        bg: 'rgb(var(--bg) / <alpha-value>)',
+        surface: 'rgb(var(--surface) / <alpha-value>)',
+        card: 'rgb(var(--card) / <alpha-value>)',
+        field: 'rgb(var(--field) / <alpha-value>)',
+        fg: 'rgb(var(--fg) / <alpha-value>)',
+        border: 'rgb(var(--border) / <alpha-value>)',
+        grid: 'rgb(var(--grid) / <alpha-value>)',
         // forge/temper palette
         forge: '#e8743b',
         temper: '#3b9ae8',

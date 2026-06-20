@@ -1,6 +1,6 @@
 import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { WORKSPACE_DIR } from '../config'
+import { getWorkspaceDir } from '../config'
 import { emitEvent } from '../run/runEvents'
 import { resolvePrompt } from '../run/resolvePrompt'
 import { loadSkillText } from '../skills/skillLoader'
@@ -169,12 +169,13 @@ export function effectiveWorkingDir(node: GraphNode, nodes: GraphNode[], edges: 
 }
 
 function resolveCwd(workingDir: string): string {
-  let dir = WORKSPACE_DIR
+  const workspace = getWorkspaceDir()
+  let dir = workspace
   if (workingDir.trim()) {
-    const candidate = path.resolve(WORKSPACE_DIR, workingDir) // absolute paths pass through path.resolve
+    const candidate = path.resolve(workspace, workingDir) // absolute paths pass through path.resolve
     // Confine to the workspace: an imported/shared graph must not point a run
     // (and its sandboxed tools) at an arbitrary directory like ~/.claude.
-    const wsReal = path.resolve(WORKSPACE_DIR)
+    const wsReal = path.resolve(workspace)
     if (candidate === wsReal || candidate.startsWith(wsReal + path.sep)) {
       dir = candidate
     } else {
@@ -196,7 +197,7 @@ function stageFileInputs(node: GraphNode, nodes: GraphNode[], edges: GraphEdge[]
     const src = nodes.find((n) => n.id === e.source)
     if (src?.data.kind !== 'file') continue
     for (const fp of filePathsOf(src.data.config)) {
-      const abs = path.isAbsolute(fp) ? fp : path.resolve(WORKSPACE_DIR, fp)
+      const abs = path.isAbsolute(fp) ? fp : path.resolve(getWorkspaceDir(), fp)
       try {
         if (!existsSync(abs)) continue
         mkdirSync(path.join(cwd, 'inputs'), { recursive: true })
@@ -309,7 +310,7 @@ export async function runOneNode(
     const protoDir = path.join(cwd, 'proto')
     const v = await verifyProtoDir(protoDir)
     if (v) {
-      const protoRel = path.relative(WORKSPACE_DIR, protoDir).split(path.sep).join('/')
+      const protoRel = path.relative(getWorkspaceDir(), protoDir).split(path.sep).join('/')
       verdict = {
         distribution: v.distribution,
         allCorrect: v.allCorrect,
@@ -367,7 +368,7 @@ async function archiveWarehouse(
     return exts ? exts.includes(ext) : !JUNK_EXT.has(ext)
   }
 
-  const base = path.join(WORKSPACE_DIR, 'warehouse', node.id)
+  const base = path.join(getWorkspaceDir(), 'warehouse', node.id)
   mkdirSync(base, { recursive: true })
   const prior = readdirSync(base).filter((d) => /^run-\d+/.test(d))
   const idx = String(prior.length + 1).padStart(3, '0')
@@ -412,7 +413,7 @@ async function archiveWarehouse(
     }
   }
 
-  const rel = path.relative(WORKSPACE_DIR, runDir).split(path.sep).join('/')
+  const rel = path.relative(getWorkspaceDir(), runDir).split(path.sep).join('/')
   const result =
     count > 0 ? `Archived ${count} file(s) → ${rel}` : `Nothing matched (collect: ${collect}) — no run folder created.`
   emitEvent(runId, { type: 'result', nodeId: node.id, ok: true, result })
