@@ -1,0 +1,15 @@
+node_modules
+dist
+dist-ssr
+*.local
+*.log
+
+# local run-history DB + paper workspaces
+.forge-temper/
+workspace/
+
+# editor / OS
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea

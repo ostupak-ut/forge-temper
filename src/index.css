@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+/* Render native controls (select dropdowns, their highlight, scrollbars) in
+   dark mode — fixes the unreadable/“wrong option highlighted” select dropdown. */
+:root {
+  color-scheme: dark;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background: #0b0f17;
+  color: #e5e7eb;
+}
+
+/* marching-ants for the active Temper→Forge feedback edge */
+.ft-feedback-edge {
+  animation: ft-dash 0.55s linear infinite;
+}
+@keyframes ft-dash {
+  to {
+    stroke-dashoffset: -18;
+  }
+}
+
+/* React Flow zoom/fit controls: make the +/- icons visible on the dark theme */
+.react-flow__controls {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.react-flow__controls-button {
+  background: #121826;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  width: 26px;
+  height: 26px;
+}
+.react-flow__controls-button:hover {
+  background: #1e293b;
+}
+.react-flow__controls-button svg {
+  fill: #cbd5e1;
+  max-width: 14px;
+  max-height: 14px;
+}
+
+/* MiniMap surface tint */
+.react-flow__minimap {
+  background: #0b0f17;
+}

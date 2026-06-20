@@ -1,0 +1,49 @@
+{
+  "name": "forge-temper",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Visual flow modeller that automates the forge<->temper paper-prototyping loop via local Claude Code",
+  "scripts": {
+    "dev": "concurrently -n web,server -c cyan,magenta \"npm:dev:web\" \"npm:dev:server\"",
+    "dev:web": "vite",
+    "dev:server": "tsx watch server/index.ts",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "server": "tsx server/index.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.181",
+    "@codemirror/lang-markdown": "^6.5.0",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/view": "^6.43.1",
+    "@fastify/cors": "^11.2.0",
+    "@uiw/react-codemirror": "^4.25.10",
+    "@xyflow/react": "^12.11.0",
+    "better-sqlite3": "^12.11.1",
+    "clsx": "^2.1.1",
+    "fastify": "^5.8.5",
+    "lucide-react": "^1.21.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "tailwind-merge": "^3.6.0",
+    "zod": "^4.4.3",
+    "zod-to-json-schema": "^3.25.2",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.9.3",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "autoprefixer": "^10.5.0",
+    "concurrently": "^10.0.3",
+    "postcss": "^8.5.15",
+    "tailwindcss": "^3.4.19",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16"
+  }
+}
