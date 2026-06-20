@@ -301,6 +301,7 @@ export async function runOneNode(
   const graphContext = buildGraphContext(node, nodes, edges, {
     enabled: getGraphAware(),
     template: getGraphTemplate() ?? undefined,
+    cwd,
   })
   // A custom Verifier agent emits a PASS/FAIL line the loop reads as its verdict,
   // so an until-pass loop can converge on a custom agent (not just Temper).
@@ -404,7 +405,11 @@ async function archiveWarehouse(
     return exts ? exts.includes(ext) : !JUNK_EXT.has(ext)
   }
 
-  const base = path.join(getWorkspaceDir(), 'warehouse', node.id)
+  // Stable, user-settable pile name (defaults to the node id for back-compat).
+  // Reusing a name lets a fresh node re-attach to (restore) an existing pile.
+  const whNameRaw = typeof cfg.warehouseName === 'string' ? cfg.warehouseName.trim() : ''
+  const whName = whNameRaw ? whNameRaw.replace(/[^\w.\- ]/g, '_') : node.id
+  const base = path.join(getWorkspaceDir(), 'warehouse', whName)
   mkdirSync(base, { recursive: true })
   const prior = readdirSync(base).filter((d) => /^run-\d+/.test(d))
   const idx = String(prior.length + 1).padStart(3, '0')

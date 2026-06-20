@@ -379,6 +379,14 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
     outputs: [],
     fields: [
       {
+        key: 'warehouseName',
+        label: 'Warehouse name',
+        kind: 'text',
+        group: 'Warehouse',
+        placeholder: 'defaults to this node',
+        help: 'The pile lives at warehouse/<name>. Reuse a name to restore an old pile or share one across nodes.',
+      },
+      {
         key: 'collect',
         label: 'Collect',
         kind: 'select',
@@ -393,7 +401,7 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
       },
       { key: 'pile', label: 'Pile', kind: 'warehouse', group: 'Warehouse' },
     ],
-    defaultConfig: { collect: 'pdf' },
+    defaultConfig: { collect: 'all', warehouseName: '' },
     reactFlowType: 'ftNode',
   },
 }

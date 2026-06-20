@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Archive,
   BookmarkPlus,
@@ -549,19 +549,49 @@ function FilesField({ value, onChange }: { value: string[]; onChange: (v: string
 
 /** Gallery of a Warehouse node's accumulated runs (newest first), each expandable to its files. */
 function WarehouseGallery({ nodeId }: { nodeId: string }) {
-  const base = `warehouse/${nodeId}`
+  const whName = useGraphStore((s) => {
+    const nm = s.nodes.find((x) => x.id === nodeId)?.data.config?.warehouseName
+    return (typeof nm === 'string' && nm.trim()) || nodeId
+  })
+  const updateNodeConfig = useGraphStore((s) => s.updateNodeConfig)
+  const runStatus = useGraphStore((s) => s.runState[nodeId]?.status)
+  const base = `warehouse/${whName}`
   const [runs, setRuns] = useState<FsLite[]>([])
   const [openRun, setOpenRun] = useState<string | null>(null)
   const [files, setFiles] = useState<FsLite[]>([])
-  const reload = () =>
-    fetch(`/api/fs/list?path=${encodeURIComponent(base)}`)
+  const [loading, setLoading] = useState(false)
+  const [existing, setExisting] = useState<string[]>([])
+
+  const reload = useCallback(() => {
+    setLoading(true)
+    return fetch(`/api/fs/list?path=${encodeURIComponent(base)}`)
       .then((r) => r.json())
       .then((d) => setRuns(((d.items ?? []) as FsLite[]).filter((i) => i.dir).sort((a, b) => b.name.localeCompare(a.name))))
       .catch(() => setRuns([]))
+      .finally(() => setLoading(false))
+  }, [base])
+
+  const loadExisting = useCallback(() => {
+    fetch('/api/fs/list?path=warehouse')
+      .then((r) => r.json())
+      .then((d) => setExisting(((d.items ?? []) as FsLite[]).filter((i) => i.dir).map((i) => i.name)))
+      .catch(() => setExisting([]))
+  }, [])
+
   useEffect(() => {
-    reload()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodeId])
+    setOpenRun(null)
+    void reload()
+    loadExisting()
+  }, [reload, loadExisting])
+
+  // Auto-refresh the pile the moment this warehouse finishes archiving a run.
+  useEffect(() => {
+    if (runStatus === 'done') {
+      void reload()
+      loadExisting()
+    }
+  }, [runStatus, reload, loadExisting])
+
   useEffect(() => {
     if (!openRun) {
       setFiles([])
@@ -572,18 +602,58 @@ function WarehouseGallery({ nodeId }: { nodeId: string }) {
       .then((d) => setFiles(((d.items ?? []) as FsLite[]).filter((i) => !i.dir)))
       .catch(() => setFiles([]))
   }, [openRun])
+
+  const clearPile = async () => {
+    if (!window.confirm(`Clear warehouse "${whName}"? This deletes all piled runs from disk.`)) return
+    setLoading(true)
+    await fetch(`/api/fs/delete?path=${encodeURIComponent(base)}`, { method: 'DELETE' }).catch(() => {})
+    setOpenRun(null)
+    await reload()
+    loadExisting()
+  }
+
+  const adoptable = existing.filter((n) => n !== whName)
   const raw = (rel: string) => `/api/fs/raw?path=${encodeURIComponent(rel)}`
   return (
     <div className="space-y-1.5">
+      {adoptable.length > 0 && (
+        <select
+          className={inputCls}
+          value=""
+          onChange={(e) => e.target.value && updateNodeConfig(nodeId, 'warehouseName', e.target.value)}
+          title="Re-attach this node to an existing warehouse pile (restore it)"
+        >
+          <option value="">adopt an existing warehouse…</option>
+          {adoptable.map((n) => (
+            <option key={n} value={n} className="bg-card">
+              {n}
+            </option>
+          ))}
+        </select>
+      )}
       <div className="flex items-center gap-2 text-[10px] text-fg/45">
-        <span>
-          {runs.length} run{runs.length === 1 ? '' : 's'} piled
+        <span className="min-w-0 truncate">
+          {runs.length} run{runs.length === 1 ? '' : 's'} · <span className="font-mono text-fg/55">{whName}</span>
         </span>
-        <button onClick={reload} className="ml-auto rounded p-0.5 hover:bg-fg/10" title="Refresh">
-          <RefreshCw className="size-3" />
+        <button
+          onClick={() => void reload()}
+          disabled={loading}
+          className="ml-auto rounded p-0.5 hover:bg-fg/10 disabled:opacity-50"
+          title="Refresh"
+        >
+          <RefreshCw className={'size-3 ' + (loading ? 'animate-spin' : '')} />
         </button>
+        {runs.length > 0 && (
+          <button
+            onClick={clearPile}
+            className="rounded p-0.5 text-fg/30 hover:bg-red-500/20 hover:text-red-300"
+            title="Clear this warehouse (delete its runs from disk)"
+          >
+            <Trash2 className="size-3" />
+          </button>
+        )}
       </div>
-      {runs.length === 0 && (
+      {runs.length === 0 && !loading && (
         <p className="text-[10px] text-fg/30">No results yet — run the graph; each run adds a folder here.</p>
       )}
       <div className="space-y-1">

@@ -113,15 +113,15 @@ export function buildGraphContext(
   node: GraphNode,
   nodes: GraphNode[],
   edges: GraphEdge[],
-  opts: { enabled?: boolean; template?: string } = {},
+  opts: { enabled?: boolean; template?: string; cwd?: string } = {},
 ): string {
   if (opts.enabled === false) return ''
   const { map, feedsWarehouse } = buildGraphMap(node, nodes, edges)
   const tpl = opts.template && opts.template.trim() ? opts.template : DEFAULT_GRAPH_TEMPLATE
   let out = tpl.includes('{{graph}}') ? tpl.replace('{{graph}}', map) : `${tpl}\n\n${map}`
   if (feedsWarehouse) {
-    out +=
-      '\n\nIMPORTANT: a Warehouse downstream COLLECTS your results from disk. SAVE your output artifact(s) as real files in your current working directory (e.g. actually write/compile the .pdf, .md, or .tex) — do NOT just describe them in your reply, or nothing will be collected.'
+    const where = opts.cwd ? `this exact folder: ${opts.cwd}` : 'your current working directory'
+    out += `\n\nIMPORTANT — a Warehouse downstream COLLECTS your results from disk. Write your output artifact(s) as REAL FILES inside ${where} (e.g. actually write/compile the .pdf, .md, or .tex; anything under that folder is collected EXCEPT an inputs/ subfolder). Do NOT save them anywhere else, and do NOT merely describe them in your reply — otherwise nothing is collected.`
   }
   return out
 }
