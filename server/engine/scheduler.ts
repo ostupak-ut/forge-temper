@@ -36,6 +36,9 @@ export async function schedule(
   // Every node's text output, keyed by node id, so any downstream agent can EAT
   // it (runOneNode merges these into the matching input port's {{var}}).
   const results = new Map<string, string>()
+  // Pure data/config nodes are NOT executed — they only contribute their value
+  // (via valueForSource) to downstream agents. loopcontrol is config-only too.
+  const NON_EXEC = new Set(['idea', 'file', 'infocard', 'loopcontrol'])
 
   while (ready.length) {
     if (signal.aborted) break
@@ -53,7 +56,7 @@ export async function schedule(
       if (report) results.set(sup.plan.verdictSourceId, report)
     } else {
       const node = nodes.find((n) => n.id === sup.id)
-      if (node && node.data.kind !== 'loopcontrol') {
+      if (node && !NON_EXEC.has(node.data.kind)) {
         if (signal.aborted) break
         // The provider emits its own status/token/result events; we only need
         // to surface a thrown error (e.g. the needsAgent gate).
