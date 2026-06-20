@@ -114,7 +114,7 @@ export function Palette() {
         )
       })}
       <p className="mt-auto px-1 pt-2 text-[10px] leading-tight text-fg/25">
-        Click to add, or drag onto the canvas. Save a configured Custom Agent (★ in its Inspector) to reuse it here.
+        Click to add, or drag onto the canvas. Save a configured Custom Agent (★ in its Properties panel) to reuse it here.
       </p>
     </div>
   )

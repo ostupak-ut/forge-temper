@@ -102,7 +102,7 @@ export function App() {
           ) : (
             <button
               onClick={() => setInspectorOpen(true)}
-              title="Open inspector"
+              title="Open properties panel"
               className="flex w-7 shrink-0 items-center justify-center border-l border-border/10 bg-surface text-fg/40 transition hover:bg-fg/5 hover:text-fg/80"
             >
               <PanelRightOpen className="size-4" />

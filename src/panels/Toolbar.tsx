@@ -10,24 +10,125 @@ import type { Edge } from '@xyflow/react'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-function topoOrder(nodes: FtNode[], allEdges: Edge[]): string[] {
-  // Feedback edges are decorative (driver-carried), so they don't constrain order.
-  const edges = allEdges.filter((e) => e.type !== 'feedback')
-  const indeg = new Map(nodes.map((n) => [n.id, 0]))
-  for (const e of edges) indeg.set(e.target, (indeg.get(e.target) ?? 0) + 1)
-  const queue = [...indeg.entries()].filter(([, d]) => d === 0).map(([id]) => id)
-  const order: string[] = []
-  while (queue.length) {
-    const id = queue.shift()!
-    order.push(id)
-    for (const e of edges.filter((x) => x.source === id)) {
-      const d = (indeg.get(e.target) ?? 1) - 1
-      indeg.set(e.target, d)
-      if (d === 0) queue.push(e.target)
+type DryStep = { id: string; iteration?: number }
+
+const reachOver = (start: string, adj: Map<string, string[]>): Set<string> => {
+  const seen = new Set<string>([start])
+  const q = [start]
+  while (q.length) {
+    const n = q.shift()!
+    for (const m of adj.get(n) ?? []) if (!seen.has(m)) { seen.add(m); q.push(m) }
+  }
+  return seen
+}
+
+/** Topo-sort a loop body over forward edges; back-edge target first, source last. */
+function topoBody(body: Set<string>, fAdj: Map<string, string[]>, targetId: string, sourceId: string): string[] {
+  const indeg = new Map<string, number>()
+  for (const id of body) indeg.set(id, 0)
+  const adj = new Map<string, string[]>()
+  for (const [s, ts] of fAdj) {
+    if (!body.has(s)) continue
+    for (const t of ts) {
+      if (!body.has(t)) continue
+      ;(adj.get(s) ?? adj.set(s, []).get(s)!).push(t)
+      indeg.set(t, (indeg.get(t) ?? 0) + 1)
     }
   }
-  for (const n of nodes) if (!order.includes(n.id)) order.push(n.id)
-  return order
+  const ready = [...body].filter((id) => (indeg.get(id) ?? 0) === 0)
+  ready.sort((a, b) => (a === targetId ? -1 : b === targetId ? 1 : 0))
+  const order: string[] = []
+  const seen = new Set<string>()
+  while (ready.length) {
+    const n = ready.shift()!
+    if (seen.has(n)) continue
+    seen.add(n)
+    order.push(n)
+    for (const m of adj.get(n) ?? []) {
+      indeg.set(m, (indeg.get(m) ?? 0) - 1)
+      if ((indeg.get(m) ?? 0) <= 0 && !seen.has(m)) ready.push(m)
+    }
+  }
+  for (const id of body) if (!seen.has(id)) order.push(id)
+  return [...order.filter((id) => id !== sourceId), sourceId]
+}
+
+/**
+ * Build the dry-run animation sequence — loop-aware, mirroring the engine: each
+ * loop body (a feedback edge that truly closes a cycle) is repeated its
+ * maxIterations, tagged with the iteration number; everything else runs once in
+ * topo order over forward edges.
+ */
+function dryRunSequence(nodes: FtNode[], allEdges: Edge[]): DryStep[] {
+  const fwd = allEdges.filter((e) => e.type !== 'feedback')
+  const feedback = allEdges.filter((e) => e.type === 'feedback')
+
+  const fAdj = new Map<string, string[]>()
+  const rAdj = new Map<string, string[]>()
+  for (const e of fwd) {
+    ;(fAdj.get(e.source) ?? fAdj.set(e.source, []).get(e.source)!).push(e.target)
+    ;(rAdj.get(e.target) ?? rAdj.set(e.target, []).get(e.target)!).push(e.source)
+  }
+
+  type Loop = { id: string; order: string[]; n: number }
+  const loops: Loop[] = []
+  const loopOf = new Map<string, string>()
+  feedback.forEach((fb, i) => {
+    const fromTarget = reachOver(fb.target, fAdj)
+    if (!fromTarget.has(fb.source)) return // dangling feedback edge — not a real loop
+    const toSource = reachOver(fb.source, rAdj)
+    const body = new Set<string>([fb.target, fb.source])
+    for (const id of fromTarget) if (toSource.has(id)) body.add(id)
+    if ([...body].some((id) => loopOf.has(id))) return // one cycle per node
+    const order = topoBody(body, fAdj, fb.target, fb.source)
+    const data = (fb.data ?? {}) as { maxIterations?: number }
+    const n = Math.max(1, Math.floor(Number(data.maxIterations)) || 3)
+    const id = `loop-${i}`
+    loops.push({ id, order, n })
+    for (const nid of body) loopOf.set(nid, id)
+  })
+
+  // Condensation: each loop body collapses to one super-node; topo-sort supers.
+  const sup = (nid: string) => loopOf.get(nid) ?? nid
+  const supers = new Set<string>(nodes.map((n) => sup(n.id)))
+  const sAdj = new Map<string, Set<string>>()
+  const indeg = new Map<string, number>()
+  for (const s of supers) indeg.set(s, 0)
+  for (const e of fwd) {
+    const s = sup(e.source)
+    const t = sup(e.target)
+    if (s === t) continue
+    const set = sAdj.get(s) ?? sAdj.set(s, new Set()).get(s)!
+    if (!set.has(t)) {
+      set.add(t)
+      indeg.set(t, (indeg.get(t) ?? 0) + 1)
+    }
+  }
+  const ready = [...supers].filter((s) => (indeg.get(s) ?? 0) === 0)
+  const ordered: string[] = []
+  const seen = new Set<string>()
+  while (ready.length) {
+    const s = ready.shift()!
+    if (seen.has(s)) continue
+    seen.add(s)
+    ordered.push(s)
+    for (const t of sAdj.get(s) ?? []) {
+      indeg.set(t, (indeg.get(t) ?? 0) - 1)
+      if ((indeg.get(t) ?? 0) <= 0 && !seen.has(t)) ready.push(t)
+    }
+  }
+  for (const s of supers) if (!seen.has(s)) ordered.push(s)
+
+  const steps: DryStep[] = []
+  for (const s of ordered) {
+    const loop = loops.find((l) => l.id === s)
+    if (loop) {
+      for (let it = 1; it <= loop.n; it++) for (const id of loop.order) steps.push({ id, iteration: it })
+    } else {
+      steps.push({ id: s })
+    }
+  }
+  return steps
 }
 
 const CURRENT_KEY = 'ft.currentFlow'
@@ -120,11 +221,12 @@ export function Toolbar() {
   const onDemoRun = async () => {
     const st = useGraphStore.getState()
     st.resetRun()
-    for (const id of topoOrder(st.nodes, st.edges)) {
-      st.setRunState(id, { status: 'running' })
-      st.setActiveEdges(st.edges.filter((e) => e.source === id).map((e) => e.id))
-      await sleep(650)
-      st.setRunState(id, { status: 'done' })
+    for (const step of dryRunSequence(st.nodes, st.edges)) {
+      const iter = step.iteration ? { iteration: step.iteration } : {}
+      st.setRunState(step.id, { status: 'running', ...iter })
+      st.setActiveEdges(st.edges.filter((e) => e.source === step.id).map((e) => e.id))
+      await sleep(450)
+      st.setRunState(step.id, { status: 'done', ...iter })
     }
     st.setActiveEdges([])
   }
