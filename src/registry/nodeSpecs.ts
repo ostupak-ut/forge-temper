@@ -232,7 +232,7 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
     kind: 'custom',
     label: 'Custom Agent',
     description:
-      'Freely-wireable agent — your name, prompt, provider/model, tool scope, file input. Drops anywhere, including onto the Forge↔Temper loop.',
+      'Freely-wireable agent — name it, prompt it, pick a provider/model, tool scope, file inputs. Drops anywhere in a flow, including onto a loop. Can act as a loop Verifier.',
     color: '#22d3ee',
     icon: Sparkles,
     inputs: [

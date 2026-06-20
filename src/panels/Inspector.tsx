@@ -127,7 +127,7 @@ const SUGGESTED_MODELS: Record<string, { id: string; name: string }[]> = {
   ],
 }
 
-/** Model picker: a Claude dropdown for claude-code, a pick-or-type list otherwise. */
+/** Model picker — a single-click <select> for every provider (no double-click). */
 function ModelField({
   provider,
   options,
@@ -141,44 +141,31 @@ function ModelField({
 }) {
   const [models, setModels] = useState<ModelInfo[]>([])
   useEffect(() => {
-    if (provider !== 'claude-code') fetchModels(provider).then(setModels)
+    // Only OpenRouter has a live model API; codex/harness use curated lists.
+    if (provider !== 'claude-code' && !SUGGESTED_MODELS[provider]) fetchModels(provider).then(setModels)
   }, [provider])
 
+  // claude-code uses its passed MODEL_OPTIONS; others = Inherit + curated/fetched.
+  let opts: FieldOption[]
   if (provider === 'claude-code') {
-    return (
-      <select className={inputCls} value={value} onChange={(e) => onChange(e.target.value)}>
-        {options.map((o) => (
-          <option key={o.value} value={o.value} className="bg-card">
-            {o.label}
-          </option>
-        ))}
-      </select>
-    )
+    opts = options
+  } else {
+    const curated = SUGGESTED_MODELS[provider] ?? []
+    const merged = [...curated, ...models.filter((m) => !curated.some((c) => c.id === m.id))]
+    opts = [{ value: 'inherit', label: 'Inherit (default)' }, ...merged.map((m) => ({ value: m.id, label: m.name }))]
   }
-  const listId = `models-${provider}`
-  const curated = SUGGESTED_MODELS[provider] ?? []
-  // Curated suggestions first (codex/harness), then any live-fetched (openrouter).
-  const suggestions = [...curated, ...models.filter((m) => !curated.some((c) => c.id === m.id))]
-  const placeholder = curated.length
-    ? 'pick a model or type one — blank = inherit/CLI default'
-    : 'e.g. openai/gpt-5.1, anthropic/claude-sonnet-4.5'
+  const cur = String(value ?? 'inherit') || 'inherit'
+  // Keep a previously-set model selectable even if it isn't in the current list.
+  if (cur !== 'inherit' && !opts.some((o) => o.value === cur)) opts = [...opts, { value: cur, label: `${cur} (custom)` }]
+
   return (
-    <>
-      <input
-        className={inputCls + ' font-mono'}
-        list={listId}
-        value={value === 'inherit' ? '' : value}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value || 'inherit')}
-      />
-      <datalist id={listId}>
-        {suggestions.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.name}
-          </option>
-        ))}
-      </datalist>
-    </>
+    <select className={inputCls} value={cur} onChange={(e) => onChange(e.target.value)}>
+      {opts.map((o) => (
+        <option key={o.value} value={o.value} className="bg-card">
+          {o.label}
+        </option>
+      ))}
+    </select>
   )
 }
 
@@ -870,7 +857,14 @@ export function Inspector({ onClose }: { onClose?: () => void }) {
       </div>
 
       <div className="flex-1 space-y-4 overflow-auto p-3">
-        <p className="text-[11px] leading-tight text-fg/35">{spec.description}</p>
+        <textarea
+          className="w-full resize-none rounded-md border border-transparent bg-transparent px-1 py-0.5 text-[11px] leading-tight text-fg/45 outline-none hover:border-border/15 focus:border-temper focus:bg-field"
+          rows={2}
+          value={String(cfg.description ?? '')}
+          placeholder={spec.description}
+          title="Description / note for this node (shows on the node and feeds its self-awareness)"
+          onChange={(e) => updateNodeConfig(selectedId, 'description', e.target.value)}
+        />
 
         {run && (
           <div className="rounded-lg border border-border/10 bg-field p-2 text-[11px]">

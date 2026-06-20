@@ -166,7 +166,11 @@ function GenericNodeImpl({ id, data, selected }: NodeProps<FtNode>) {
             {run.tail.slice(-220)}
           </pre>
         ) : (
-          <p className="line-clamp-2 text-[11px] text-fg/35">{spec.description}</p>
+          <p className="line-clamp-2 text-[11px] text-fg/35">
+            {(typeof (data.config as { description?: unknown })?.description === 'string' &&
+              ((data.config as { description?: string }).description ?? '').trim()) ||
+              spec.description}
+          </p>
         )}
         {run?.verdict && (
           <div className="mt-1.5">

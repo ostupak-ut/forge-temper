@@ -349,7 +349,7 @@ export function Toolbar() {
           <button
             className={btn + ' !border-emerald-400/40 !bg-emerald-500/15 text-emerald-200 hover:!bg-emerald-500/25'}
             onClick={() => void runGraph()}
-            title="Really run the whole graph: forge → temper, iterating the loop until all-correct or the cap."
+            title="Run the whole graph: every node in dependency order, iterating any loops until they pass or hit the cap."
           >
             <CirclePlay className="size-3.5" /> Run Graph
           </button>

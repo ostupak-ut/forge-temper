@@ -40,6 +40,9 @@ const firstLine = (s: string, max: number): string => {
 function describeNode(n: GraphNode): string {
   const cfg = (n.data.config ?? {}) as Record<string, unknown>
   const kind = n.data.kind
+  // A user-written description/note wins for any node kind.
+  const desc = typeof cfg.description === 'string' ? cfg.description.trim() : ''
+  if (desc) return firstLine(desc, 160)
   if (kind === 'custom') {
     if (cfg.verifier === true) {
       const pc = typeof cfg.passCondition === 'string' ? cfg.passCondition.trim() : ''
