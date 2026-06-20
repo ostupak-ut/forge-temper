@@ -1,0 +1,323 @@
+% =====================================================================
+% forge :: preamble.tex  (v0.4)
+% Bundled preamble cloned at the start of every forge run.
+% Carries the theorem block + myproof env, the disc design
+% (ONE public macro \disc{v|p|h|c} + [v|p|h|c] coloured discs on the
+% result environments), per-key AUTO-COUNT totals persisted to .aux,
+% the RARITY star strip (\rarity{<0..5 in 0.5 steps>}), and the full-page
+% collectible-card cover (\makeprotocover -- v0.4: a standalone first page
+% with a STORY block, a tier NAME beside the stars, and a described
+% CONFIDENCE legend + RARITY-tier legend).
+% pdflatex-safe. Stars via fontawesome5. xcolor arrives via tcolorbox[most].
+% =====================================================================
+
+% --- fonts (adopted from main_r1.tex) ---
+\usepackage[T1]{fontenc}
+\usepackage{textcomp}
+\usepackage{libertine}
+\usepackage[libertine]{newtxmath}
+
+% --- core math / symbols ---
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\let\Bbbk\relax  % silence duplicate-definition warning (newtxmath vs amssymb)
+\usepackage{amssymb}
+\usepackage[most]{tcolorbox}  % grey/coloured boxes; also pulls in xcolor
+\usepackage{array}            % \extrarowheight + p-columns for the skeleton table
+\usepackage{fontawesome5}     % \faStar / \faStarHalf / \faStar[regular] for \rarity
+
+% --- geometry: more whitespace than the old 1in (centred, ~1.3in) ---
+\usepackage[a4paper,margin=1.3in]{geometry}
+
+% --- math operator shortcuts (subset from main_r1.tex) ---
+\newcommand*{\prob}{\mathsf{P}}  % probability
+\newcommand*{\ex}{\mathsf{E}}    % expectation
+
+% =====================================================================
+% Theorems and proofs
+% =====================================================================
+% amsthm is loaded for \newtheoremstyle (the disc design). It does not
+% conflict with the custom myproof env below (we do NOT use amsthm's proof).
+% newtxmath already defines \openbox, so neutralise it before amsthm
+% redefines it (otherwise: "Command \openbox already defined").
+\let\openbox\relax
+\usepackage{amsthm}
+
+% --- status colours (xcolor available via tcolorbox[most]) ---
+\definecolor{stverified}{RGB}{34,139,34}    % green  -> verified
+\definecolor{stplausible}{RGB}{31,119,180}  % blue   -> plausible
+\definecolor{stheuristic}{RGB}{230,140,0}   % orange -> heuristic
+\definecolor{stconjectured}{RGB}{200,30,30} % red    -> conjectured
+
+% --- the disc glyph: a colour-filled bullet, nudged onto the baseline.
+% Drawn as a scaled $\bullet$ via \textcolor so NO TikZ dependency is needed.
+% Internal helper only; the single PUBLIC macro is \disc{v|p|h|c} below.
+\newcommand{\discbullet}[1]{{\textcolor{#1}{\raisebox{0.05ex}{\large$\bullet$}}}}
+
+% --- THE one public macro: \disc{X}, X in {v,p,h,c}. One alphabet everywhere.
+%     v = verified (green), p = plausible (blue),
+%     h = heuristic (orange), c = conjectured (red).
+%     Unknown/empty keys print nothing (graceful).
+\newcommand{\disc}[1]{%
+  \ifx\\#1\\%                      % empty arg -> nothing
+  \else
+    \begingroup
+    \def\tmp{#1}%
+    \def\kv{v}\ifx\tmp\kv\discbullet{stverified}\fi
+    \def\kp{p}\ifx\tmp\kp\discbullet{stplausible}\fi
+    \def\kh{h}\ifx\tmp\kh\discbullet{stheuristic}\fi
+    \def\kc{c}\ifx\tmp\kc\discbullet{stconjectured}\fi
+    \endgroup
+  \fi
+}
+
+% =====================================================================
+% Rarity strip :: \rarity{<n>}  (the AMBITION axis -- distinct from POWER)
+% =====================================================================
+% n in {0,0.5,1,...,5}. Renders five stars out of five via fontawesome5:
+%   filled  \faStar          (full point)
+%   half    \faStarHalf      (the .5 point)
+%   empty   \faStar[regular] (outline -- unearned point)
+% Gold-toned to read as a separate axis from the coloured POWER discs.
+% pdflatex-safe: tested on TeX Live 2024 (\faStarHalfAlt does NOT exist
+% here; \faStarHalf is the correct half-star glyph).
+\definecolor{strarity}{RGB}{200,150,0}  % gold -> ambition / rarity
+%
+% Implementation: work in HALF-STAR UNITS to keep everything integer and
+% avoid any float arithmetic. \rar@two = round(2*#1), so each whole star is
+% worth 2 units and a half star is 1 unit. Parsing 2*#1 from an argument
+% that may carry ".5": \rar@parse strips an optional ".5" tail.
+%   "4.5" -> 2*4 + 1 = 9 ;  "3" -> 2*3 = 6.
+% NOTE: preamble is \input in the BODY where @ is catcode-12, so every
+% @-bearing control sequence here MUST sit inside \makeatletter ... .
+\makeatletter
+\newcount\rar@two
+\newcount\rar@slot
+\newcount\rar@rem
+% \rar@parse #1 -> sets \rar@two = 2*#1 (handles integer or x.5).
+% Trick: append ".0" so the fractional field is ALWAYS a digit, whether the
+% caller wrote "3" (-> 3.0.0) or "4.5" (-> 4.5.0). \rar@split keeps the
+% integer part #1 and the FIRST fractional digit #2; trailing tokens #3 are
+% swallowed up to the \relax sentinel.
+\def\rar@parse#1{\edef\rar@arg{#1}\expandafter\rar@split\rar@arg.0.\relax}
+\def\rar@split#1.#2#3\relax{%
+  \rar@two=#1\relax \multiply\rar@two by 2\relax
+  % #2 is the first fractional digit; a leading 5 means a half-star.
+  \ifnum#2=5 \advance\rar@two by 1\relax\fi}
+%
+% \rarity{<n>}: parse to half-units, then walk 5 slots. Slot k (1..5) is
+% full if >=2 units remain, half if exactly 1 remains, else empty.
+\newcommand{\rarity}[1]{%
+  \begingroup
+  \rar@parse{#1}%                          \rar@two = 2*n  (half-units)
+  {\color{strarity}%
+   \rar@slot=0
+   \loop
+     \advance\rar@slot by 1
+     \rar@rem=\rar@two
+     \advance\rar@rem by -\numexpr 2*(\rar@slot-1)\relax  % units left for slot
+     \ifnum\rar@rem>1 \faStar
+     \else\ifnum\rar@rem=1 \faStarHalf
+     \else {\faStar[regular]}%
+     \fi\fi
+   \ifnum\rar@slot<5 \repeat}%
+  \endgroup
+}
+\makeatother
+% Four total-counters tick up each time a result env is opened with
+% [v|p|h|c]. totcount persists each grand total to the .aux file, so the
+% COVER (page 1, before the blocks) prints CORRECT counts after latexmk's
+% normal multi-pass run. Exposed as \protoTotV \protoTotP \protoTotH
+% \protoTotC, each expanding to the persisted total.
+\usepackage{totcount}
+\newtotcounter{proto@v}\newtotcounter{proto@p}%
+\newtotcounter{proto@h}\newtotcounter{proto@c}
+
+% \protototal{<totcounter>}: robustly expand to the persisted grand total,
+% yielding 0 (not an empty token) before the .aux has been read on pass 1.
+% This keeps \ifnum\protoTotV>0 well formed on every pass.
+\newcommand{\protototal}[1]{%
+  \ifcsname c@#1@totc\endcsname \totvalue{#1}\else 0\fi}
+\newcommand{\protoTotV}{\protototal{proto@v}}
+\newcommand{\protoTotP}{\protototal{proto@p}}
+\newcommand{\protoTotH}{\protototal{proto@h}}
+\newcommand{\protoTotC}{\protototal{proto@c}}
+
+% \protocount{<key>}: bump the matching total-counter. Called by \dischead.
+\newcommand{\protocount}[1]{%
+  \def\tmp{#1}%
+  \def\kv{v}\ifx\tmp\kv\stepcounter{proto@v}\fi
+  \def\kp{p}\ifx\tmp\kp\stepcounter{proto@p}\fi
+  \def\kh{h}\ifx\tmp\kh\stepcounter{proto@h}\fi
+  \def\kc{c}\ifx\tmp\kc\stepcounter{proto@c}\fi
+}
+
+% --- head wrapper: bump the count, then render disc + thin space, but ONLY
+%     when the key is non-empty (an empty slot leaves no stray space).
+\newcommand{\dischead}[1]{%
+  \ifx\\#1\\\else\protocount{#1}\disc{#1}\thinspace\fi
+}
+
+% --- custom theorem style: NOTE (#3 = the [v|p|h|c] key) rendered FIRST as a
+%     disc, then name+number. amsthm delivers \begin{env}[<key>] into #3 free.
+\newtheoremstyle{status}%
+  {\topsep}%                                  space above
+  {\topsep}%                                  space below
+  {\itshape}%                                 body font
+  {}%                                         indent
+  {\bfseries}%                                head font
+  {.}%                                        punctuation after head
+  {.5em}%                                     space after head
+  {\dischead{#3}\thmname{#1}\thmnumber{ #2}}% HEAD: disc{#3} BEFORE name+number
+\theoremstyle{status}
+
+% --- the eight environments (same names/labels as main_r1.tex) ---
+\newtheorem{claim}{Claim}
+\newtheorem{assumption}{Assumption}
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+\newtheorem{definition}{Definition}
+\newtheorem{lemma}{Lemma}
+\newtheorem{corollary}{Corollary}
+\newtheorem{remark}{Remark}
+
+% --- custom proof environment (verbatim from main_r1.tex, line 76).
+%     #1 = type label (e.g. Proposition), #2 = the \ref{...}.
+%     Kept hand-rolled; we do NOT use amsthm's proof.
+\newenvironment{myproof}[2]{\paragraph{Proof of {#1} {#2}.}}{\hfill $\blacksquare$}
+
+% =====================================================================
+% Building-block visual furniture
+% =====================================================================
+% \blocktag{<text>}: a thin full-width rule + a small bold tag, so each
+% building block reads as a distinct card rather than a wall of text.
+\newcommand{\blocktag}[1]{%
+  \par\bigskip
+  {\color{gray!55}\rule{\linewidth}{0.4pt}}\par
+  \nobreak\vspace{2pt}%
+  {\footnotesize\bfseries\color{gray!70}#1}\par
+  \nobreak\vspace{2pt}%
+}
+
+% Inline part labels for inside a block.
+\newcommand{\Intuition}{\noindent\textbf{Intuition.}\ }
+\newcommand{\Proofsketch}{\noindent\textbf{Proof sketch.}\ }
+\newcommand{\Risk}{\noindent\textbf{Risk.}\ }
+\newcommand{\Uses}{\noindent\textbf{Uses $\rightarrow$}\ }
+
+% =====================================================================
+% Collectible-card cover :: \makeprotocover   (v0.4 -- full first page)
+% =====================================================================
+% Reads the document-set macros (all defined before \begin{document}):
+%   \protonum \protoslug \protofield \protodate \prototitle
+%   \protosubtitle \protostory \protopunch \protospine
+%   \protorarity (0..5 in .5 steps) \prototier (a tier NAME, never a journal)
+%   \protoraritynote (one short line, tier language only)
+% The card is its OWN full first page (titlepage-style, \thispagestyle{empty}),
+% then \clearpage hands a fresh page 2 to the abstract/body.
+% Two distinct axes:
+%   * RARITY = gold stars (\rarity), AMBITION, with a tier NAME alongside.
+%   * CONFIDENCE = coloured POWER discs (\protoTotV/P/H/C, auto-counted).
+% The totals expand to \value{...} which is NOT digestible by \ifnum, so we
+% stage each into a scratch counter and read it back number-safely.
+\newcounter{proto@scratch}
+\newcommand{\makeprotocover}{%
+\thispagestyle{empty}%
+\begingroup
+\setlength{\parindent}{0pt}%
+\null\vspace*{\fill}
+\begin{tcolorbox}[enhanced, breakable=false, sharp corners=downhill,
+                  colback=gray!2, colframe=gray!55, boxrule=0.8pt,
+                  arc=4pt, left=16pt, right=16pt, top=14pt, bottom=14pt,
+                  drop shadow southeast]
+  % --- top row: id / field / date  ---  forge stamp ---
+  {\footnotesize\color{gray!75}%
+    \textbf{№\,\protonum}\;\textperiodcentered\;\protofield
+    \;\textperiodcentered\;\protodate
+    \hfill \textsc{forge \textperiodcentered\ beta 0.1}}\par
+  \vspace{5pt}
+  {\color{gray!40}\rule{\linewidth}{0.4pt}}\par
+  \vspace{10pt}
+  % --- title / subtitle ---
+  {\LARGE\bfseries \prototitle\par}
+  \vspace{3pt}
+  {\itshape\color{gray!75} \protosubtitle\par}
+  \vspace{12pt}
+  % --- STORY block: the most important line on the card ---
+  {\footnotesize\bfseries\color{gray!70}STORY\par}
+  \vspace{3pt}
+  {\protostory\par}
+  \vspace{8pt}
+  % --- punch line (the one-line mechanism / contribution) ---
+  {\color{stplausible}$\blacktriangleright$}\ \protopunch\par
+  \vspace{12pt}
+  {\color{gray!40}\rule{\linewidth}{0.4pt}}\par
+  \vspace{9pt}
+  % --- rarity line: stars (n/5) + tier NAME, then the note in gray italic ---
+  {\textbf{RARITY.}\ %
+    \rarity{\protorarity}\ %
+    {\color{strarity}(\protorarity/5)}\;\textperiodcentered\;%
+    \textsc{\prototier}\par}
+  \vspace{2pt}
+  {\footnotesize\itshape\color{gray!70}\protoraritynote\par}
+  \vspace{9pt}
+  % --- spine ---
+  {\textbf{SPINE.}\ \protospine\par}
+  \vspace{9pt}
+  {\color{gray!40}\rule{\linewidth}{0.4pt}}\par
+  \vspace{9pt}
+  % --- CONFIDENCE legend: described, one level per line, with live tally ---
+  {\footnotesize\bfseries\color{gray!70}CONFIDENCE \textnormal{\color{gray!60}%
+     (coloured discs --- how sure each result is)}\par}
+  \vspace{3pt}
+  {\footnotesize
+   \setcounter{proto@scratch}{\protoTotV}%
+     \disc{v}~\textbf{Verified}\ \textbf{(\arabic{proto@scratch})} ---
+     a complete proof checked, or numerically confirmed by \textsc{temper}\par
+   \setcounter{proto@scratch}{\protoTotP}%
+     \disc{p}~\textbf{Plausible}\ \textbf{(\arabic{proto@scratch})} ---
+     the key step is checked; the proof is not yet complete\par
+   \setcounter{proto@scratch}{\protoTotH}%
+     \disc{h}~\textbf{Heuristic}\ \textbf{(\arabic{proto@scratch})} ---
+     intuition or analogy only; unchecked\par
+   \setcounter{proto@scratch}{\protoTotC}%
+     \disc{c}~\textbf{Conjectured}\ \textbf{(\arabic{proto@scratch})} ---
+     believed; no argument yet\par}
+  \vspace{4pt}
+  {\footnotesize\color{gray!75}%
+    \setcounter{proto@scratch}{\protoTotV}%
+    \ifnum\value{proto@scratch}>0
+      \disc{v}\ \arabic{proto@scratch}\ verified so far.%
+    \else
+      \disc{v}\ 0 verified --- run \textsc{temper} to charge them green.%
+    \fi\par}
+  \vspace{9pt}
+  {\color{gray!40}\rule{\linewidth}{0.4pt}}\par
+  \vspace{9pt}
+  % --- RARITY-tier legend (gold stars = ambition; distinct from confidence) ---
+  {\footnotesize\bfseries\color{gray!70}RARITY TIERS \textnormal{\color{gray!60}%
+     (gold stars --- how ambitious the target is)}\par}
+  \vspace{3pt}
+  {\footnotesize\color{gray!75}%
+    {\color{strarity}5}~top-5 \quad
+    {\color{strarity}4}~flagship field \quad
+    {\color{strarity}3}~strong field \quad
+    {\color{strarity}2}~seed \quad
+    {\color{strarity}1}~below-bar\par}
+\end{tcolorbox}%
+\vspace*{\fill}
+\endgroup
+\clearpage
+}
+
+% =====================================================================
+% Footer stamp
+% =====================================================================
+\newcommand{\forgestamp}{prototype \textperiodcentered\ forge \textperiodcentered\ beta 0.1}
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+\fancyfoot[C]{\footnotesize\color{gray!70}\forgestamp}
+\fancyfoot[R]{\footnotesize\color{gray!70}\thepage}

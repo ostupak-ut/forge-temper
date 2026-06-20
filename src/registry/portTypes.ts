@@ -11,6 +11,7 @@ export const PORT_COLOR: Record<PortType, string> = {
   bib: '#14b8a6',
   file: '#94a3b8',
   control: '#f43f5e',
+  any: '#cbd5e1',
 }
 
 /**
@@ -24,6 +25,8 @@ const EXTRA_COMPATIBLE: Partial<Record<PortType, PortType[]>> = {
 
 export function arePortsCompatible(source: PortType, target: PortType): boolean {
   if (source === target) return true
+  // The Custom Agent node's universal `any` port wires to/from anything.
+  if (source === 'any' || target === 'any') return true
   return EXTRA_COMPATIBLE[source]?.includes(target) ?? false
 }
 

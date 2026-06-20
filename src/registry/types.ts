@@ -8,7 +8,7 @@ export type NodeKind =
   | 'file'
   | 'forge'
   | 'temper'
-  | 'loop'
+  | 'custom'
   | 'body'
   | 'literature'
   | 'assemble'
@@ -33,6 +33,8 @@ export type FieldKind =
   | 'boolean'
   | 'path'
   | 'model'
+  | 'multiselect'
+  | 'icon'
 
 export interface FieldOption {
   label: string
@@ -79,7 +81,7 @@ export interface NodeSpec {
   outputs: Port[]
   fields: FieldDescriptor[]
   defaultConfig: NodeConfig
-  /** Loop is a resizable container that holds Forge+Temper. */
+  /** Legacy: a resizable container (the old Loop zone). Retained as dead-but-legal. */
   isContainer?: boolean
   /** Which React Flow node component renders it. */
   reactFlowType: 'ftNode' | 'ftGroup'

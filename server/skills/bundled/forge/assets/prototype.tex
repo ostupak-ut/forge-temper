@@ -1,0 +1,203 @@
+% =====================================================================
+% forge :: prototype.tex  (v0.4)
+% Complete, compilable example document. The runtime entry point that
+% forge clones. Compile with:  latexmk -pdf prototype.tex
+% (expects preamble.tex / proofs.tex / skeleton.tex in same directory).
+% Sample content uses the endo-blotto example so the scaffold looks real.
+% =====================================================================
+\documentclass[10pt,a4paper]{article}
+
+\input{preamble}
+
+% --- document-set macros read by \makeprotocover (define BEFORE document) ---
+\newcommand{\protonum}{007}
+\newcommand{\protoslug}{endo-blotto}
+\newcommand{\protofield}{econ}
+\newcommand{\protodate}{\today}
+\newcommand{\prototitle}{Endogenous Battlefields in Colonel Blotto}
+\newcommand{\protosubtitle}{When contestants choose where to fight before how hard}
+% --- STORY: the overall world of the paper -- who needs the result and why.
+%     DIFFERENT from \protopunch (the one-line mechanism/contribution below). ---
+\newcommand{\protostory}{Defenders often must build up what they are about to
+  fight over --- infrastructure, capacity, reputation --- before the contest
+  begins. This paper asks how that pre-conflict investment should be spread when
+  the thing being protected has diminishing value, and shows the answer flips the
+  classic ``concentrate everything'' prescription.}
+\newcommand{\protopunch}{Letting players pick the battlefield set first collapses the
+  classic mixed equilibrium onto a sparse, characterisable support.}
+\newcommand{\protospine}{Lemma~\ref{lem:concentrate} $\to$ Corollary~\ref{cor:sparse}
+  $\to$ Proposition~\ref{prop:exist} $\Rightarrow$ Theorem~\ref{thm:char}}
+% --- rarity (AMBITION axis): n in {0,0.5,...,5}, a tier NAME, + a one-line why.
+%     \prototier is a GENERAL tier name only -- NEVER a specific journal. ---
+\newcommand{\protorarity}{3}
+\newcommand{\prototier}{strong field}
+\newcommand{\protoraritynote}{a real seed today; strong-field ceiling if the
+  global-curvature claim closes.}
+% --- RARITY RATIONALE: 1-2 sentences, rendered at the END, on WHY this tier ---
+%     what earns the rung, and what would lift or lower it. Fuller than the
+%     card's one-line \protoraritynote. ---
+\newcommand{\protorarityrationale}{Strong-field, not flagship: it puts a genuinely
+  new, tractable twist---endogenous front-selection---on a canonical model and
+  extracts a clean closed form, which is novel enough to place well. But it is one
+  mechanism on a known game rather than a new framework; it would climb a tier if
+  the characterisation extended past the symmetric case or anchored a concrete
+  application.}
+
+\title{\prototitle}
+\date{\protodate}
+
+\begin{document}
+
+% The cover owns page 1 (\thispagestyle{empty}) and \clearpage's to page 2,
+% where \pagestyle{fancy} (set in the preamble) resumes for the body.
+\makeprotocover
+
+\begin{abstract}
+\noindent We study Colonel Blotto with an \emph{endogenous} battlefield stage:
+each player first selects a subset of fronts to open, then allocates a fixed
+budget across the union of opened fronts. The selection stage is shown to
+concentrate effort, which sparsifies the support of any equilibrium allocation
+and lets us characterise the resulting mixed equilibrium in closed form. This is
+a forge prototype: every result carries a coloured status disc, an intuition
+line, a footnote-sized proof sketch, and a forward dependency pointer. Proof
+sketches sit in the appendix; the dependency-flow skeleton closes the document.
+\end{abstract}
+
+% =====================================================================
+\section{Setup}\label{sec:setup}
+% =====================================================================
+
+\paragraph{Players} \noindent Two players $i\in\{A,B\}$, each holding a budget
+normalised to $1$ and facing $n$ potential fronts.
+
+\paragraph{Timing} \noindent The game proceeds in two stages:
+\begin{enumerate}\setlength{\itemsep}{1pt}
+  \item Selection stage: each player picks a set $S_i\subseteq\{1,\dots,n\}$ of
+        fronts to open, at cost $\kappa$ per front.
+  \item Allocation stage: players simultaneously allocate their unit budget
+        across the contested union $S_A\cup S_B$, winning a front by outspending
+        the rival there.
+\end{enumerate}
+
+\paragraph{Strategies} \noindent A pure strategy is a pair: an open set
+$S_i\subseteq\{1,\dots,n\}$ and a budget vector on $S_A\cup S_B$ summing to $1$.
+Mixed strategies are distributions over such pairs; the second-stage allocation
+is mixed in equilibrium.
+
+\paragraph{Payoffs} \noindent A player's payoff is the number of fronts won
+minus opening costs: front $f$ is won by whoever spends strictly more there
+(ties split evenly), and each opened front carries cost $\kappa$.
+
+\paragraph{Solution concept} \noindent Subgame-perfect equilibrium, solved by
+backward induction: the allocation stage is fixed first for each $(S_A,S_B)$,
+then the selection stage is optimised against it.
+
+\begin{assumption}[v]\label{ass:cost}
+The per-front opening cost satisfies $0<\kappa<1/n$, and ties on a front are
+split evenly.
+\end{assumption}
+
+\noindent\Intuition The cost is small enough that opening at least one front is
+always worthwhile, but positive, so players never open fronts they cannot
+contest.
+
+\begin{proposition}[p]\label{prop:exist}
+For any fixed pair of open sets $(S_A,S_B)$, the second-stage allocation game
+has a mixed equilibrium.
+\end{proposition}
+
+\noindent\Intuition The reduced allocation game is a finite-budget Blotto on the
+contested union; existence follows from the standard concavification of the
+per-front contest, independently of how the fronts were selected.
+
+% =====================================================================
+\section{Building blocks}\label{sec:blocks}
+% =====================================================================
+
+\blocktag{BLOCK 1 \textperiodcentered\ concentration lemma}
+\begin{lemma}[p]\label{lem:concentrate}
+In any equilibrium, each player opens at most $\lceil 1/(2\kappa)\rceil$ fronts.
+\end{lemma}
+
+\Intuition Spreading the budget thinly makes every front cheap to steal, so a
+deviation that abandons a thin front and reinforces another strictly pays once
+the opening cost is sunk; the cap is the point where this stops paying.
+
+{\footnotesize\Proofsketch Bound the marginal win-probability of a front
+receiving budget $b$ and compare against $\kappa$; fronts below the threshold are
+dropped. Check \checkmark\ (symbolic): at $\kappa\to 1/n$ the cap $\to\lceil
+n/2\rceil$, matching the all-fronts-open benchmark.\par}
+
+{\footnotesize\Risk The bound assumes a single binding deviation; coalitional or
+multi-front deviations are not yet ruled out.\par}
+
+\Uses Assumption~\ref{ass:cost}.
+
+\blocktag{BLOCK 2 \textperiodcentered\ sparse support}
+\begin{corollary}[h]\label{cor:sparse}
+The equilibrium allocation has support on $O(1/\kappa)$ fronts, independent of
+$n$.
+\end{corollary}
+
+\Intuition If both players open boundedly many fronts, the contested union is
+bounded too, so almost all of the $n$ fronts are never touched and drop out of
+the support.
+
+{\footnotesize\Proofsketch Union the two caps from
+Lemma~\ref{lem:concentrate}. Check \checkmark\ (symbolic): support size
+$\le 2\lceil 1/(2\kappa)\rceil = O(1/\kappa)$, free of $n$.\par}
+
+{\footnotesize\Risk Treats the two players' open sets as independent; overlap
+could shrink \emph{or} reshape the support in ways not captured here.\par}
+
+\Uses Lemma~\ref{lem:concentrate}.
+
+\blocktag{BLOCK 3 \textperiodcentered\ characterisation}
+\begin{theorem}[c]\label{thm:char}
+A symmetric mixed equilibrium exists in which each player opens exactly
+$m^\star=\lceil 1/(2\kappa)\rceil$ fronts and allocates uniformly on
+$[0,2/m^\star]$ per opened front.
+\end{theorem}
+
+\Intuition With a sparse, symmetric support the second stage reduces to a
+standard Blotto on $m^\star$ symmetric fronts, whose equilibrium is the uniform
+marginal --- the selection stage just fixes which fronts that runs on.
+
+{\footnotesize\Proofsketch Existence of the reduced game by
+Proposition~\ref{prop:exist}; plug the sparse support from
+Corollary~\ref{cor:sparse} into the uniform-marginal solution. Check \checkmark\
+(symbolic): per-front mean $1/m^\star$ sums to budget $1$.\par}
+
+{\footnotesize\Risk Symmetry is imposed, not derived; asymmetric equilibria with
+the same support may coexist and are conjectural.\par}
+
+\Uses Corollary~\ref{cor:sparse}, Proposition~\ref{prop:exist}.
+
+% =====================================================================
+\section*{Open joints}
+% =====================================================================
+\begin{itemize}\setlength{\itemsep}{1pt}
+  \item Rule out multi-front and coalitional deviations in
+        Lemma~\ref{lem:concentrate} (would promote \disc{p}$\to$\disc{v}).
+  \item Establish uniqueness, not just existence, of the symmetric equilibrium
+        in Theorem~\ref{thm:char} (currently \disc{c}).
+  \item Handle the overlap of $S_A\cap S_B$ explicitly in
+        Corollary~\ref{cor:sparse}.
+\end{itemize}
+
+% =====================================================================
+\appendix
+\input{proofs}
+
+% =====================================================================
+% Dependency-flow skeleton (vertical map of the argument)
+\input{skeleton}
+
+% --- closing verdict: why this rarity rating (1-2 sentences) ---
+\bigskip\par\noindent\rule{\linewidth}{0.4pt}\par\smallskip
+\noindent{\bfseries Why this rating.}\quad
+\rarity{\protorarity}\;(\protorarity/5)\ \textperiodcentered\ {\scshape\prototier}.\par
+\smallskip
+\noindent\protorarityrationale
+
+\end{document}

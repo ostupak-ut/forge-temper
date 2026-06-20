@@ -38,6 +38,7 @@ export interface GraphState {
   nodes: FtNode[]
   edges: Edge[]
   selectedNodeId: string | null
+  selectedEdgeId: string | null
   runState: Record<string, NodeRun>
   activeEdgeIds: string[]
   currentRunId: string | null
@@ -49,8 +50,10 @@ export interface GraphState {
   addNode: (kind: NodeKind, position: XYPosition, parentId?: string) => string
   updateNodeConfig: (id: string, key: string, value: unknown) => void
   updateNodeLabel: (id: string, label: string) => void
+  updateEdgeData: (id: string, patch: Record<string, unknown>) => void
   deleteNode: (id: string) => void
   setSelected: (id: string | null) => void
+  setSelectedEdge: (id: string | null) => void
 
   setGraph: (nodes: FtNode[], edges: Edge[]) => void
 
@@ -65,6 +68,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   nodes: [],
   edges: [],
   selectedNodeId: null,
+  selectedEdgeId: null,
   runState: {},
   activeEdgeIds: [],
   currentRunId: null,
@@ -72,11 +76,15 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   onNodesChange: (changes) => set({ nodes: applyNodeChanges(changes, get().nodes) }),
   onEdgesChange: (changes) => set({ edges: applyEdgeChanges(changes, get().edges) }),
   onConnect: (conn) => {
-    // Edges into a loopInternal port (Forge's `feedback`) render as the
-    // decorative Temper→Forge feedback link, not a scheduled edge.
+    // Edges into a loopInternal port (Forge's `feedback`) are the real
+    // Temper→Forge back-edge that DEFINES the loop. The edge carries both the
+    // verdict (each iteration) AND the loop config in its data — click to edit.
     const target = get().nodes.find((n) => n.id === conn.target)
     const port = target && getSpec(target.data.kind).inputs.find((p) => `in:${p.id}` === conn.targetHandle)
-    const edge = port?.loopInternal ? { ...conn, type: 'feedback' } : { ...conn }
+    // The back-edge carries its own loop config (mode + cap) — click it to edit.
+    const edge = port?.loopInternal
+      ? { ...conn, type: 'feedback', data: { loopBackEdge: true, mode: 'until-pass', maxIterations: 3 } }
+      : { ...conn }
     set({ edges: addEdge(edge, get().edges) })
   },
 
@@ -110,6 +118,11 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       nodes: get().nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, label } } : n)),
     }),
 
+  updateEdgeData: (id, patch) =>
+    set({
+      edges: get().edges.map((e) => (e.id === id ? { ...e, data: { ...(e.data ?? {}), ...patch } } : e)),
+    }),
+
   deleteNode: (id) =>
     set({
       nodes: get().nodes.filter((n) => n.id !== id && n.parentId !== id),
@@ -117,9 +130,11 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       selectedNodeId: get().selectedNodeId === id ? null : get().selectedNodeId,
     }),
 
-  setSelected: (id) => set({ selectedNodeId: id }),
+  setSelected: (id) => set({ selectedNodeId: id, selectedEdgeId: null }),
+  setSelectedEdge: (id) => set({ selectedEdgeId: id, selectedNodeId: null }),
 
-  setGraph: (nodes, edges) => set({ nodes, edges, selectedNodeId: null, runState: {}, activeEdgeIds: [] }),
+  setGraph: (nodes, edges) =>
+    set({ nodes, edges, selectedNodeId: null, selectedEdgeId: null, runState: {}, activeEdgeIds: [] }),
 
   setRunState: (id, run) =>
     set({ runState: { ...get().runState, [id]: { ...get().runState[id], ...run } as NodeRun } }),

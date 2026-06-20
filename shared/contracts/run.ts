@@ -14,12 +14,31 @@ export type RunEvent =
   | { type: 'token'; nodeId: string; text: string }
   | { type: 'tool'; nodeId: string; tool: string }
   | { type: 'result'; nodeId: string; ok: boolean; result?: string; costUsd?: number; sessionId?: string }
-  | { type: 'verdict'; nodeId: string; distribution: DiscTally; allCorrect: boolean; results: number; protoDir?: string }
+  | {
+      type: 'verdict'
+      nodeId: string
+      distribution: DiscTally
+      allCorrect: boolean
+      results: number
+      protoDir?: string
+      iteration?: number
+    }
+  | {
+      type: 'iteration'
+      loopId: string
+      nodeId: string
+      iteration: number
+      distribution: DiscTally
+      results: number
+      allCorrect: boolean
+      protoDir?: string
+    }
+  | { type: 'loop-done'; loopId: string; converged: boolean; iterations: number; reason: string }
   | { type: 'error'; nodeId: string; error: string }
   | { type: 'run-done'; status: 'done' | 'error' | 'stopped' }
 
 export interface StartRunRequest {
-  mode: 'single'
-  nodeId: string
+  mode: 'single' | 'graph'
+  nodeId?: string
   graph: { nodes: unknown[]; edges: unknown[] }
 }

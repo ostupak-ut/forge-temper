@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
-import { Play, Square, Trash2, Upload } from 'lucide-react'
+import { Play, Repeat, Square, Trash2, Upload } from 'lucide-react'
+import type { Edge } from '@xyflow/react'
 import { useGraphStore } from '@/store/graphStore'
 import { getSpec } from '@/registry/nodeSpecs'
+import { AGENT_ICONS, ICON_NAMES, resolveNodeIcon } from '@/registry/icons'
 import type { FieldDescriptor, FieldOption } from '@/registry/types'
 import type { NodeRunStatus } from '@shared/contracts'
 import { runSingleNode, stopCurrentRun } from '@/run/runController'
 import { fetchModels, type ModelInfo } from '@/run/providerModels'
 import { DiscBar } from '@/components/DiscBar'
+import { MultiSelectField } from '@/components/MultiSelectField'
 import { PromptEditor } from './PromptEditor'
 
 const STATUS_PILL: Record<NodeRunStatus, string> = {
@@ -123,6 +126,34 @@ function ModelField({
   )
 }
 
+/** Grid of selectable symbols for a Custom Agent node. */
+function IconField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="grid grid-cols-8 gap-1">
+      {ICON_NAMES.map((name) => {
+        const I = AGENT_ICONS[name]
+        const active = value === name
+        return (
+          <button
+            key={name}
+            type="button"
+            title={name}
+            onClick={() => onChange(name)}
+            className={
+              'grid aspect-square place-items-center rounded-md border transition ' +
+              (active
+                ? 'border-temper bg-temper/15 text-temper'
+                : 'border-white/10 bg-white/5 text-white/55 hover:bg-white/10 hover:text-white/80')
+            }
+          >
+            <I className="size-4" />
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 /** Shows a run's produced artifacts inline: the compiled PDF + links to .md/.tex. */
 function NodeOutput({ protoDir }: { protoDir: string }) {
   const [files, setFiles] = useState<{ name: string; rel: string }[]>([])
@@ -172,6 +203,77 @@ function NodeOutput({ protoDir }: { protoDir: string }) {
   )
 }
 
+/** Config panel for a selected edge. The Temper→Forge feedback arrow IS the loop. */
+function EdgeInspector({
+  edge,
+  updateEdgeData,
+  onDelete,
+}: {
+  edge: Edge
+  updateEdgeData: (id: string, patch: Record<string, unknown>) => void
+  onDelete: () => void
+}) {
+  const isLoop = edge.type === 'feedback' || Boolean((edge.data as { loopBackEdge?: unknown })?.loopBackEdge)
+  const data = (edge.data ?? {}) as { mode?: string; maxIterations?: number }
+  return (
+    <div className="flex h-full w-80 shrink-0 flex-col border-l border-white/10 bg-[#0d1320]">
+      <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2">
+        <Repeat className="size-4 text-rose-400" />
+        <span className="flex-1 text-sm font-medium text-white/90">{isLoop ? 'Loop' : 'Connection'}</span>
+        <button
+          onClick={onDelete}
+          title={isLoop ? 'Remove the loop (delete this arrow)' : 'Delete this edge'}
+          className="rounded p-1 text-white/40 hover:bg-red-500/20 hover:text-red-300"
+        >
+          <Trash2 className="size-4" />
+        </button>
+      </div>
+      <div className="flex-1 space-y-4 overflow-auto p-3">
+        {isLoop ? (
+          <>
+            <p className="text-[11px] leading-tight text-white/35">
+              This arrow is the loop: Temper’s verdict flows back into Forge each iteration until all results are
+              correct or the cap is hit.
+            </p>
+            <div className="space-y-1">
+              <label className="block text-[11px] text-white/55">Mode</label>
+              <select
+                className={inputCls}
+                value={data.mode ?? 'until-pass'}
+                onChange={(e) => updateEdgeData(edge.id, { mode: e.target.value })}
+              >
+                <option value="until-pass" className="bg-[#121826]">
+                  Until pass (smart: temper all-correct)
+                </option>
+                <option value="until-count" className="bg-[#121826]">
+                  Until count (fixed iterations)
+                </option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="block text-[11px] text-white/55">Max iterations</label>
+              <input
+                type="number"
+                className={inputCls}
+                min={1}
+                max={20}
+                step={1}
+                value={Number(data.maxIterations ?? 3)}
+                onChange={(e) => updateEdgeData(edge.id, { maxIterations: e.target.value === '' ? '' : Number(e.target.value) })}
+              />
+              <p className="text-[10px] leading-tight text-white/25">Always a hard cap, even in smart mode.</p>
+            </div>
+          </>
+        ) : (
+          <p className="text-[11px] leading-tight text-white/35">
+            A data connection. Select the Temper→Forge feedback arrow to configure the loop.
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function Inspector() {
   const selectedId = useGraphStore((s) => s.selectedNodeId)
   const node = useGraphStore((s) => s.nodes.find((n) => n.id === s.selectedNodeId) ?? null)
@@ -179,18 +281,35 @@ export function Inspector() {
   const updateNodeConfig = useGraphStore((s) => s.updateNodeConfig)
   const updateNodeLabel = useGraphStore((s) => s.updateNodeLabel)
   const deleteNode = useGraphStore((s) => s.deleteNode)
+  const selectedEdgeId = useGraphStore((s) => s.selectedEdgeId)
+  const edge = useGraphStore((s) => s.edges.find((e) => e.id === s.selectedEdgeId) ?? null)
+  const updateEdgeData = useGraphStore((s) => s.updateEdgeData)
+  const setSelectedEdge = useGraphStore((s) => s.setSelectedEdge)
+  const onEdgesChange = useGraphStore((s) => s.onEdgesChange)
 
   if (!node || !selectedId) {
+    if (edge && selectedEdgeId) {
+      return (
+        <EdgeInspector
+          edge={edge}
+          updateEdgeData={updateEdgeData}
+          onDelete={() => {
+            onEdgesChange([{ id: edge.id, type: 'remove' }])
+            setSelectedEdge(null)
+          }}
+        />
+      )
+    }
     return (
       <div className="grid h-full w-80 shrink-0 place-items-center border-l border-white/10 bg-[#0d1320] p-4 text-center text-xs text-white/30">
-        Select a node to edit its config.
+        Select a node — or the loop arrow — to edit its config.
       </div>
     )
   }
 
   const spec = getSpec(node.data.kind)
-  const Icon = spec.icon
   const cfg = node.data.config
+  const Icon = resolveNodeIcon(cfg.symbol, spec.icon)
   const variables = spec.inputs.map((p) => p.id)
 
   const groups = new Map<string, FieldDescriptor[]>()
@@ -262,6 +381,16 @@ export function Inspector() {
             ))}
           </select>
         )
+      case 'multiselect':
+        return (
+          <MultiSelectField
+            value={Array.isArray(value) ? (value as string[]) : []}
+            options={f.options ?? []}
+            onChange={set}
+          />
+        )
+      case 'icon':
+        return <IconField value={String(value ?? 'Sparkles')} onChange={set} />
       case 'path':
         return f.pickFile ? (
           <FilePathField value={String(value ?? '')} onChange={set} placeholder={f.placeholder} />

@@ -1,0 +1,79 @@
+% =====================================================================
+% forge :: skeleton.tex  (v0.3)
+% Vertical dependency-flow map as a READABLE LOGIC STORY. One page.
+% Read down; each step follows from the ones above. Each NODE is a small
+% two-line brick:
+%   line 1:  <disc>  <FULL object name, bold via \ref>  --  <plain-English role>
+%   line 2:  (indented, smaller) <one concrete detail>  [optional (needs <Name>)]
+% Between steps: a centered down-arrow carrying the logic word ("so"/"then"/
+% "still open"). Dependencies are implied by vertical position; an explicit
+% "(needs <Full Name>)" is added ONLY for a cross-link that is not the node
+% directly above. Numbers stay synced via \ref to the labels in prototype.tex.
+% \input{skeleton} from prototype.tex (after the appendix).
+% =====================================================================
+\clearpage
+\section*{Dependency-flow skeleton}
+\addcontentsline{toc}{section}{Dependency-flow skeleton}
+
+% A NODE brick: disc, full name (bold), plain-English role; then an indented
+% smaller concrete-detail line. #1 disc | #2 \ref name | #3 role | #4 detail.
+\newcommand{\sknode}[4]{%
+  \noindent #1\, \textbf{#2} \;---\; #3\par
+  \nobreak\smallskip
+  {\footnotesize\color{gray!75}\hspace*{1.6em}#4\par}}
+
+% The logic arrow between steps, carrying the connective word.
+\newcommand{\skstep}[1]{%
+  \par\medskip\centerline{$\downarrow$\ \footnotesize\itshape\color{gray!70}#1}\par\medskip}
+
+% A faint right-aligned tier tag (optional, must not dominate).
+\newcommand{\sktag}[1]{\hfill{\scriptsize\color{gray!45}#1}}
+
+\begin{center}
+\begin{tcolorbox}[enhanced, breakable, width=0.92\linewidth,
+                  colback=gray!3, colframe=gray!45, boxrule=0.5pt,
+                  arc=3pt, left=12pt, right=12pt, top=8pt, bottom=8pt,
+                  title={Argument flow \quad
+                         \disc{v}\,V \;\disc{p}\,P \;\disc{h}\,H \;\disc{c}\,C}]
+
+\sknode{\disc{v}}{Assumption~\ref{ass:cost}}{entry costs a little, and ties split evenly}{%
+  $0<\kappa<1/n$ per front opened --- worth opening one, never worth opening all\sktag{setup}}
+
+\skstep{so}
+
+\sknode{\disc{p}}{Proposition~\ref{prop:exist}}{the contest has a mixed-strategy equilibrium}{%
+  for any opened fronts, players randomize how hard to fight on each\sktag{engine}}
+
+\skstep{and}
+
+\sknode{\disc{p}}{Lemma~\ref{lem:concentrate}}{each side opens only a few fronts}{%
+  at most $\lceil 1/(2\kappa)\rceil$ of them --- a bounded number, not all $n$\sktag{engine}}
+
+\skstep{so}
+
+\sknode{\disc{h}}{Corollary~\ref{cor:sparse}}{those few fronts don't grow with $n$}{%
+  the support stays size $O(1/\kappa)$, independent of $n$\sktag{hinge}}
+
+\skstep{so}
+
+\sknode{\disc{c}}{Theorem~\ref{thm:char}}{exact closed-form for how they play}{%
+  a symmetric mixed equilibrium: open $m^\star=\lceil 1/(2\kappa)\rceil$ fronts,
+  spend uniformly on $[0,2/m^\star]$ each
+  \;\textnormal{(needs Proposition~\ref{prop:exist})}\sktag{main result}}
+
+\skstep{still open}
+
+\sknode{\disc{c}}{Uniqueness?}{is this the only solution?}{%
+  rule out asymmetric equilibria on the same support --- would turn
+  Theorem~\ref{thm:char} green\sktag{open frontier}}
+
+\medskip
+\hrule
+\smallskip
+{\footnotesize\itshape
+Read top-to-bottom: each step follows from the ones above; the word on each
+$\downarrow$ is the logic. ``(needs $X$)'' flags a step that leans on something
+not directly above it. Disc colour = current verification status.}
+
+\end{tcolorbox}
+\end{center}

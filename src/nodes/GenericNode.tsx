@@ -4,6 +4,7 @@ import { Play, Square, X } from 'lucide-react'
 import type { FtNode } from '@/store/graphStore'
 import { useGraphStore } from '@/store/graphStore'
 import { getSpec } from '@/registry/nodeSpecs'
+import { resolveNodeIcon } from '@/registry/icons'
 import { PORT_COLOR, handleId } from '@/registry/portTypes'
 import type { Port } from '@/registry/types'
 import type { NodeRunStatus } from '@shared/contracts'
@@ -73,7 +74,7 @@ function PortRow({ port, dir }: { port: Port; dir: 'in' | 'out' }) {
 
 function GenericNodeImpl({ id, data, selected }: NodeProps<FtNode>) {
   const spec = getSpec(data.kind)
-  const Icon = spec.icon
+  const Icon = resolveNodeIcon((data.config as { symbol?: unknown })?.symbol, spec.icon)
   const run = useGraphStore((s) => s.runState[id])
   const deleteNode = useGraphStore((s) => s.deleteNode)
   const status: NodeRunStatus = run?.status ?? 'idle'
