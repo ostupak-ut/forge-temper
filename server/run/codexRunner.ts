@@ -1,4 +1,5 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
+import { spawn, type ChildProcessByStdio } from 'node:child_process'
+import type { Readable } from 'node:stream'
 import { existsSync, readdirSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -75,10 +76,12 @@ export async function runCodexNode(p: ProviderRunParams): Promise<ProviderRunRes
   args.push(prompt)
 
   return await new Promise<ProviderRunResult>((resolve) => {
-    let child: ChildProcessWithoutNullStreams
+    let child: ChildProcessByStdio<null, Readable, Readable>
     const bin = resolveCodexBin()
     try {
-      child = spawn(bin, args, { cwd: p.cwd ?? process.cwd(), env: process.env })
+      // stdin 'ignore' → immediate EOF, so `codex exec` doesn't block "Reading
+      // additional input from stdin…" waiting on a pipe we never write to.
+      child = spawn(bin, args, { cwd: p.cwd ?? process.cwd(), env: process.env, stdio: ['ignore', 'pipe', 'pipe'] })
     } catch (e) {
       return resolve(
         fail(
