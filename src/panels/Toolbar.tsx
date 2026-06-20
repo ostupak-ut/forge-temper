@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { CirclePlay, Download, FilePlus2, Play, Save, SaveAll, Sparkles, Square, Trash2, Upload } from 'lucide-react'
+import { CirclePlay, Download, FilePlus2, FolderOpen, Play, Save, SaveAll, Sparkles, Square, Trash2, Upload } from 'lucide-react'
 import { useGraphStore } from '@/store/graphStore'
 import { buildStarterGraph } from '@/io/sampleGraph'
 import { runGraph, stopCurrentRun } from '@/run/runController'
@@ -40,6 +40,7 @@ export function Toolbar() {
   const [flows, setFlows] = useState<FlowMeta[]>([])
   const [current, setCurrent] = useState<string | null>(() => localStorage.getItem(CURRENT_KEY))
   const [dirtyMsg, setDirtyMsg] = useState<string>('')
+  const [menuOpen, setMenuOpen] = useState(false)
 
   const refresh = useCallback(() => listFlows().then(setFlows), [])
   useEffect(() => void refresh(), [refresh])
@@ -97,6 +98,14 @@ export function Toolbar() {
     await refresh()
   }
 
+  const delOne = async (e: React.MouseEvent, name: string) => {
+    e.stopPropagation()
+    if (!window.confirm(`Delete flow “${name}”?`)) return
+    await deleteFlow(name)
+    if (current === name) setName(null)
+    await refresh()
+  }
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
@@ -137,28 +146,57 @@ export function Toolbar() {
         <Sparkles className="size-3.5" /> Starter
       </button>
 
-      <select
-        className="max-w-44 rounded-md border border-border/10 bg-field px-2 py-1 text-xs text-fg/80 outline-none"
-        value={current ?? ''}
-        onChange={(e) => onOpen(e.target.value)}
-        title="Open a saved flow"
-      >
-        <option value="">{flows.length ? 'open flow…' : 'no saved flows'}</option>
-        {flows.map((f) => (
-          <option key={f.name} value={f.name} className="bg-card">
-            {f.name}
-          </option>
-        ))}
-      </select>
+      <div className="relative">
+        <button
+          className={btn}
+          onClick={() => {
+            void refresh()
+            setMenuOpen((o) => !o)
+          }}
+          title="Open or manage saved flows"
+        >
+          <FolderOpen className="size-3.5" /> Open ▾
+        </button>
+        {menuOpen && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+            <div className="absolute left-0 top-full z-20 mt-1 max-h-72 w-56 overflow-auto rounded-md border border-border/15 bg-card p-1 shadow-xl">
+              {flows.length === 0 && (
+                <p className="px-2 py-2 text-[11px] text-fg/40">No saved flows yet — use Save / Save As.</p>
+              )}
+              {flows.map((f) => (
+                <div
+                  key={f.name}
+                  className="group flex items-center gap-1 rounded px-1.5 py-1 text-xs text-fg/80 hover:bg-fg/10"
+                >
+                  <button
+                    className="min-w-0 flex-1 truncate text-left"
+                    onClick={() => {
+                      onOpen(f.name)
+                      setMenuOpen(false)
+                    }}
+                  >
+                    {f.name}
+                  </button>
+                  <button
+                    className="rounded p-0.5 text-fg/25 opacity-0 hover:bg-red-500/20 hover:text-red-300 group-hover:opacity-100"
+                    title={`Delete “${f.name}”`}
+                    onClick={(e) => delOne(e, f.name)}
+                  >
+                    <Trash2 className="size-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
 
       <button className={btn} onClick={onSave} title="Save (Ctrl+S)">
         <Save className="size-3.5" /> Save
       </button>
       <button className={btn} onClick={onSaveAs} title="Save as a new name">
         <SaveAll className="size-3.5" /> Save As
-      </button>
-      <button className={btn} onClick={onDelete} disabled={!current} title="Delete current flow">
-        <Trash2 className="size-3.5" />
       </button>
 
       <span className="ml-1 text-[11px] text-fg/40">

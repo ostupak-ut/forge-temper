@@ -31,6 +31,8 @@ const EFFORT_OPTIONS = [
   { label: 'low', value: 'low' },
   { label: 'medium', value: 'medium' },
   { label: 'high', value: 'high' },
+  { label: 'xhigh (Codex)', value: 'xhigh' },
+  { label: 'max', value: 'max' },
 ]
 
 /** Fields every Claude-backed (agent) node shares. */

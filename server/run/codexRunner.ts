@@ -75,6 +75,11 @@ export async function runCodexNode(p: ProviderRunParams): Promise<ProviderRunRes
 
   const args = ['exec', '--json', '--skip-git-repo-check', '--dangerously-bypass-approvals-and-sandbox']
   if (p.model && p.model !== 'inherit') args.push('-m', p.model)
+  // Reasoning effort → codex config (max maps to codex's top, xhigh).
+  const eff = p.effort === 'max' ? 'xhigh' : p.effort
+  if (eff && ['minimal', 'low', 'medium', 'high', 'xhigh'].includes(eff)) {
+    args.push('-c', `model_reasoning_effort="${eff}"`)
+  }
   const prompt = p.systemAppend ? `${p.systemAppend}\n\n${p.prompt}` : p.prompt
   args.push(prompt)
 

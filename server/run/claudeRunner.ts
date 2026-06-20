@@ -30,6 +30,11 @@ export async function runNode(p: ProviderRunParams): Promise<ProviderRunResult> 
     ...(p.cwd ? { cwd: p.cwd } : {}),
     ...(p.model && p.model !== 'inherit' ? { model: p.model } : {}),
     ...(p.allowedTools?.length ? { allowedTools: p.allowedTools } : {}),
+    // Reasoning effort (low|medium|high|xhigh|max) — the SDK silently downgrades
+    // for models that don't support a given level.
+    ...(p.effort && ['low', 'medium', 'high', 'xhigh', 'max'].includes(p.effort)
+      ? { effort: p.effort as 'low' | 'medium' | 'high' | 'xhigh' | 'max' }
+      : {}),
     // Settings → CLI paths: override the claude binary the SDK spawns.
     ...(getCli('claude') ? { pathToClaudeCodeExecutable: getCli('claude') } : {}),
   }
