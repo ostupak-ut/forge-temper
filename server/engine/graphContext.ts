@@ -5,6 +5,11 @@ import type { GraphEdge, GraphNode } from './runOneNode'
  * so a node isn't a blind organism — it knows its place in the pipeline, what it
  * consumes, what it feeds, and the overall flow. Works for built-in and custom
  * agents alike.
+ *
+ * The wording is user-editable: Settings → "Agent self-awareness" stores a
+ * template with a `{{graph}}` placeholder where the auto-generated structural map
+ * is spliced in. `buildGraphContext` renders that template; the toggle there can
+ * turn the whole injection off.
  */
 
 const AGENT_PURPOSE: Record<string, string> = {
@@ -18,9 +23,16 @@ const AGENT_PURPOSE: Record<string, string> = {
   custom: 'a user-defined custom agent (its task is set by its own prompt below).',
 }
 
+/** Default, user-overridable wrapper. `{{graph}}` = the auto structural map. */
+export const DEFAULT_GRAPH_TEMPLATE = `## Your place in the pipeline
+{{graph}}
+
+Act so your output is exactly what the downstream steps need, and stay consistent with what the upstream steps produced. Do only YOUR step — the others handle theirs.`
+
 const isFeedback = (e: GraphEdge): boolean => e.type === 'feedback' || Boolean(e.data?.loopBackEdge)
 
-export function buildGraphContext(node: GraphNode, nodes: GraphNode[], edges: GraphEdge[]): string {
+/** The dynamic structural map only (no heading / instructions) — fills {{graph}}. */
+function buildGraphMap(node: GraphNode, nodes: GraphNode[], edges: GraphEdge[]): { map: string; feedsWarehouse: boolean } {
   const byId = new Map(nodes.map((n) => [n.id, n]))
   const label = (id: string) => byId.get(id)?.data.label ?? id
   const kind = (id: string) => byId.get(id)?.data.kind ?? '?'
@@ -37,7 +49,6 @@ export function buildGraphContext(node: GraphNode, nodes: GraphNode[], edges: Gr
 
   const purpose = AGENT_PURPOSE[node.data.kind] ?? ''
   const lines: string[] = []
-  lines.push('## Your place in the pipeline')
   lines.push(`You are **${node.data.label}** — the \`${node.data.kind}\` step${purpose ? `, which ${purpose}` : '.'}`)
   if (incoming.length) lines.push(`Inputs you receive: ${incoming.join(', ')}.`)
   if (outgoing.length) lines.push(`Your output feeds: ${outgoing.join(', ')}.`)
@@ -51,14 +62,22 @@ export function buildGraphContext(node: GraphNode, nodes: GraphNode[], edges: Gr
       lines.push(...loops)
     }
   }
-  lines.push('')
-  lines.push(
-    'Act so your output is exactly what the downstream steps need, and stay consistent with what the upstream steps produced. Do only YOUR step — the others handle theirs.',
-  )
+  return { map: lines.join('\n'), feedsWarehouse }
+}
+
+export function buildGraphContext(
+  node: GraphNode,
+  nodes: GraphNode[],
+  edges: GraphEdge[],
+  opts: { enabled?: boolean; template?: string } = {},
+): string {
+  if (opts.enabled === false) return ''
+  const { map, feedsWarehouse } = buildGraphMap(node, nodes, edges)
+  const tpl = opts.template && opts.template.trim() ? opts.template : DEFAULT_GRAPH_TEMPLATE
+  let out = tpl.includes('{{graph}}') ? tpl.replace('{{graph}}', map) : `${tpl}\n\n${map}`
   if (feedsWarehouse) {
-    lines.push(
-      'IMPORTANT: a Warehouse downstream COLLECTS your results from disk. SAVE your output artifact(s) as real files in your current working directory (e.g. actually write/compile the .pdf, .md, or .tex) — do NOT just describe them in your reply, or nothing will be collected.',
-    )
+    out +=
+      '\n\nIMPORTANT: a Warehouse downstream COLLECTS your results from disk. SAVE your output artifact(s) as real files in your current working directory (e.g. actually write/compile the .pdf, .md, or .tex) — do NOT just describe them in your reply, or nothing will be collected.'
   }
-  return lines.join('\n')
+  return out
 }

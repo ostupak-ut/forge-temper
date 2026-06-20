@@ -34,6 +34,7 @@ export type FieldKind =
   | 'boolean'
   | 'path'
   | 'model'
+  | 'skill'
   | 'multiselect'
   | 'icon'
   | 'color'

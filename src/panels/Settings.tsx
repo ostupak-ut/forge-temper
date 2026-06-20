@@ -1,6 +1,17 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { FolderOpen, KeyRound, Terminal, Type, X } from 'lucide-react'
-import { FONT_OPTIONS, getFont, setFont, subscribeFont, type AppFont } from '@/font'
+import { FolderOpen, KeyRound, Network, Terminal, Type, X } from 'lucide-react'
+import {
+  FONT_OPTIONS,
+  FONT_SIZE_OPTIONS,
+  getFont,
+  getFontSize,
+  setFont,
+  setFontSize,
+  subscribeFont,
+  subscribeFontSize,
+  type AppFont,
+  type AppFontSize,
+} from '@/font'
 
 type Presence = { openrouter: boolean; openai: boolean; anthropic: boolean }
 
@@ -22,6 +33,12 @@ export function Settings({ onClose }: { onClose: () => void }) {
   const [cli, setCli] = useState<{ codex: string; claude: string }>({ codex: '', claude: '' })
   const [savingCli, setSavingCli] = useState(false)
   const font = useSyncExternalStore(subscribeFont, getFont)
+  const fontSize = useSyncExternalStore(subscribeFontSize, getFontSize)
+  const [graphAware, setGraphAware] = useState(true)
+  const [graphTemplate, setGraphTemplate] = useState('')
+  const [defaultGraphTemplate, setDefaultGraphTemplate] = useState('')
+  const [savingGraph, setSavingGraph] = useState(false)
+  const [graphSaved, setGraphSaved] = useState(false)
   const [browse, setBrowse] = useState<{ path: string; parent: string | null; dirs: { name: string; path: string }[] } | null>(
     null,
   )
@@ -58,9 +75,34 @@ export function Settings({ onClose }: { onClose: () => void }) {
         setDefaultDir(d.defaultWorkspaceDir ?? '')
         setFolderInput(d.workspaceDir ?? '')
         setCli({ codex: d.cli?.codex ?? '', claude: d.cli?.claude ?? '' })
+        setGraphAware(d.graphAware !== false)
+        setGraphTemplate(d.graphTemplate ?? '')
+        setDefaultGraphTemplate(d.defaultGraphTemplate ?? '')
       })
       .catch(() => {})
   }, [])
+
+  const saveGraph = async (next?: { aware?: boolean; template?: string }) => {
+    setSavingGraph(true)
+    try {
+      const r = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          graphAware: next?.aware ?? graphAware,
+          graphTemplate: next?.template ?? graphTemplate,
+        }),
+      })
+      const d = await r.json()
+      setGraphAware(d.graphAware !== false)
+      setGraphTemplate(d.graphTemplate ?? '')
+      setGraphSaved(true)
+      setTimeout(() => setGraphSaved(false), 1500)
+    } catch {
+      /* ignore */
+    }
+    setSavingGraph(false)
+  }
 
   const saveCli = async () => {
     setSavingCli(true)
@@ -153,6 +195,18 @@ export function Settings({ onClose }: { onClose: () => void }) {
               </option>
             ))}
           </select>
+          <label className="block pt-1 text-[11px] text-fg/55">Text size</label>
+          <select
+            value={fontSize}
+            onChange={(e) => setFontSize(e.target.value as AppFontSize)}
+            className="w-full rounded-md border border-border/15 bg-card px-2 py-1 text-xs text-fg/90 outline-none focus:border-temper"
+          >
+            {FONT_SIZE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value} className="bg-card">
+                {o.label}
+              </option>
+            ))}
+          </select>
           <p className="text-[10px] text-fg/30">Applies instantly, saved in your browser. Toggle light/dark with the ☀/🌙 in the header.</p>
         </div>
 
@@ -183,9 +237,10 @@ export function Settings({ onClose }: { onClose: () => void }) {
             <button
               onClick={() => saveFolder()}
               disabled={savingFolder}
+              title="Make this path the active project root (creates library/, papers/, warehouse/ there)"
               className="shrink-0 rounded-md bg-emerald-500/20 px-2.5 py-1 text-xs text-emerald-300 hover:bg-emerald-500/30 disabled:opacity-50"
             >
-              {savingFolder ? '…' : 'Save'}
+              {savingFolder ? '…' : 'Set'}
             </button>
           </div>
           {folderError && <p className="text-[10px] text-rose-400">{folderError}</p>}
@@ -238,8 +293,8 @@ export function Settings({ onClose }: { onClose: () => void }) {
           )}
 
           <p className="text-[10px] text-fg/30">
-            Browse to a folder and “Use this folder”, or type a path + Save. Current:{' '}
-            <code className="text-fg/60">{workspaceDir || '—'}</code>
+            Browse to a folder and “Use this folder”, or type a path + “Set” (saves it as the active project root — that’s
+            all “Set” does; nothing is moved). Current: <code className="text-fg/60">{workspaceDir || '—'}</code>
             {defaultDir && (
               <>
                 {' '}
@@ -279,6 +334,56 @@ export function Settings({ onClose }: { onClose: () => void }) {
               className="rounded-md bg-sky-500/20 px-3 py-1 text-xs text-sky-300 hover:bg-sky-500/30 disabled:opacity-50"
             >
               {savingCli ? 'Saving…' : 'Save CLI paths'}
+            </button>
+          </div>
+        </div>
+
+        <div className="mb-4 space-y-2 rounded-lg border border-border/15 bg-fg/[0.03] p-3">
+          <div className="flex items-center gap-2 text-xs font-medium text-fg/80">
+            <Network className="size-4 text-temper" />
+            Agent self-awareness
+          </div>
+          <p className="text-[11px] text-fg/40">
+            Before each agent runs, Forge prepends an auto-generated map of where the node sits in the graph (what it
+            consumes, what it feeds, the loops) to its system prompt — so it knows its role. Edit the wrapper below;{' '}
+            <code className="text-fg/60">{'{{graph}}'}</code> is replaced by the live map at run time.
+          </p>
+          <label className="flex items-center gap-2 text-[11px] text-fg/70">
+            <input
+              type="checkbox"
+              checked={graphAware}
+              onChange={(e) => {
+                setGraphAware(e.target.checked)
+                void saveGraph({ aware: e.target.checked })
+              }}
+            />
+            Inject graph context into every agent
+          </label>
+          <textarea
+            value={graphTemplate}
+            onChange={(e) => setGraphTemplate(e.target.value)}
+            disabled={!graphAware}
+            rows={8}
+            spellCheck={false}
+            className="w-full rounded-md border border-border/15 bg-card px-2 py-1 font-mono text-[11px] leading-relaxed text-fg/90 outline-none focus:border-temper disabled:opacity-50"
+          />
+          <div className="flex items-center justify-end gap-2">
+            {graphSaved && <span className="mr-auto text-[10px] text-emerald-300">saved</span>}
+            <button
+              onClick={() => {
+                setGraphTemplate(defaultGraphTemplate)
+                void saveGraph({ template: defaultGraphTemplate })
+              }}
+              className="rounded-md px-2 py-1 text-[11px] text-fg/50 hover:bg-fg/10"
+            >
+              Reset to default
+            </button>
+            <button
+              onClick={() => void saveGraph()}
+              disabled={savingGraph || !graphAware}
+              className="rounded-md bg-temper/20 px-3 py-1 text-xs text-temper hover:bg-temper/30 disabled:opacity-50"
+            >
+              {savingGraph ? 'Saving…' : 'Save template'}
             </button>
           </div>
         </div>

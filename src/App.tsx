@@ -1,12 +1,13 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { ReactFlowProvider } from '@xyflow/react'
-import { Anvil, FolderTree, Moon, PanelRightOpen, Settings as SettingsIcon, Sun } from 'lucide-react'
+import { Anvil, FolderTree, HelpCircle, Moon, PanelRightOpen, Settings as SettingsIcon, Sun } from 'lucide-react'
 import { FlowCanvas } from '@/canvas/FlowCanvas'
 import { Palette } from '@/panels/Palette'
 import { Inspector } from '@/panels/Inspector'
 import { Toolbar } from '@/panels/Toolbar'
 import { FileManager } from '@/panels/FileManager'
 import { Settings } from '@/panels/Settings'
+import { Help } from '@/panels/Help'
 import { useGraphStore } from '@/store/graphStore'
 import { loadAutosave, saveAutosave, serializeGraph } from '@/io/serialize'
 import { getTheme, subscribe, toggleTheme } from '@/theme'
@@ -65,6 +66,7 @@ export function App() {
   useAutosave()
   const [filesOpen, setFilesOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
   const [inspectorOpen, setInspectorOpen] = useState(true)
   return (
     <ReactFlowProvider>
@@ -77,6 +79,13 @@ export function App() {
           <span className="text-sm text-fg/40">Visual Flow Modeller</span>
           <div className="ml-auto flex items-center gap-3 text-xs">
             <HealthBadge />
+            <button
+              onClick={() => setHelpOpen(true)}
+              title="How Forge works — legend & quickstart"
+              className="flex size-7 items-center justify-center rounded text-fg/50 transition hover:bg-fg/10 hover:text-fg/80"
+            >
+              <HelpCircle className="size-4" />
+            </button>
             <ThemeToggle />
           </div>
         </header>
@@ -123,6 +132,7 @@ export function App() {
         </div>
 
         {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}
+        {helpOpen && <Help onClose={() => setHelpOpen(false)} />}
       </div>
     </ReactFlowProvider>
   )

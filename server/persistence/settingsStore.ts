@@ -17,9 +17,13 @@ mkdirSync(DATA_DIR, { recursive: true })
 let keys: Partial<Record<ProviderKey, string>> = {}
 let workspaceDir: string | null = null
 let cli: Partial<Record<CliName, string>> = {}
+let graphAware = true
+let graphTemplate: string | null = null
 
 function persist() {
-  writeFileSync(FILE, JSON.stringify({ providerKeys: keys, workspaceDir, cli }, null, 2), { mode: 0o600 })
+  writeFileSync(FILE, JSON.stringify({ providerKeys: keys, workspaceDir, cli, graphAware, graphTemplate }, null, 2), {
+    mode: 0o600,
+  })
 }
 
 function load() {
@@ -29,10 +33,14 @@ function load() {
       keys = j.providerKeys ?? {}
       workspaceDir = typeof j.workspaceDir === 'string' && j.workspaceDir.trim() ? j.workspaceDir : null
       cli = j.cli && typeof j.cli === 'object' ? j.cli : {}
+      graphAware = j.graphAware !== false
+      graphTemplate = typeof j.graphTemplate === 'string' && j.graphTemplate.trim() ? j.graphTemplate : null
     } catch {
       keys = {}
       workspaceDir = null
       cli = {}
+      graphAware = true
+      graphTemplate = null
     }
   }
   // Merge into env so spawned children + fetch() inherit them.
@@ -101,5 +109,22 @@ export function setCliSettings(partial: Partial<Record<CliName, string>>): void 
     if (typeof v === 'string' && v.trim()) cli[name] = v.trim()
     else delete cli[name]
   }
+  persist()
+}
+
+/** Whether the auto "where you are in the pipeline" context is injected. */
+export function getGraphAware(): boolean {
+  return graphAware
+}
+
+/** The user's custom self-awareness template, or null to use the built-in default. */
+export function getGraphTemplate(): string | null {
+  return graphTemplate
+}
+
+/** Update the self-awareness toggle and/or template. Empty template → default. */
+export function setGraphSettings(p: { aware?: boolean; template?: string | null }): void {
+  if (typeof p.aware === 'boolean') graphAware = p.aware
+  if ('template' in p) graphTemplate = typeof p.template === 'string' && p.template.trim() ? p.template : null
   persist()
 }

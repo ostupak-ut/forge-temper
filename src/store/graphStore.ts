@@ -13,8 +13,50 @@ import {
 import type { DiscTally, NodeRunStatus } from '@shared/contracts'
 import type { FtNodeData, NodeKind } from '@/registry/types'
 import { getSpec } from '@/registry/nodeSpecs'
+import { arePortsCompatible } from '@/registry/portTypes'
 
 export type FtNode = Node<FtNodeData>
+
+/** Is `goal` reachable from `start` following forward (non-feedback) edges only? */
+function forwardReaches(start: string, goal: string, fwd: Edge[]): boolean {
+  if (start === goal) return true
+  const seen = new Set<string>()
+  const stack = [start]
+  while (stack.length) {
+    const cur = stack.pop()!
+    for (const e of fwd) {
+      if (e.source !== cur) continue
+      if (e.target === goal) return true
+      if (!seen.has(e.target)) {
+        seen.add(e.target)
+        stack.push(e.target)
+      }
+    }
+  }
+  return false
+}
+
+/**
+ * The return edge that closes a loop: `from`'s first output → `to`'s first
+ * non-feedback, type-compatible input. Used to auto-complete a loop when the
+ * user wires out→feedback but nothing yet feeds back to the source.
+ */
+function buildReturnEdge(nodes: FtNode[], fromId: string, toId: string): Edge | null {
+  const from = nodes.find((n) => n.id === fromId)
+  const to = nodes.find((n) => n.id === toId)
+  if (!from || !to) return null
+  const out = getSpec(from.data.kind).outputs[0]
+  if (!out) return null
+  const inPort = getSpec(to.data.kind).inputs.find((p) => !p.loopInternal && arePortsCompatible(out.type, p.type))
+  if (!inPort) return null
+  return {
+    id: `auto-${fromId}-${toId}-${Math.random().toString(36).slice(2, 7)}`,
+    source: fromId,
+    sourceHandle: `out:${out.id}`,
+    target: toId,
+    targetHandle: `in:${inPort.id}`,
+  }
+}
 
 export interface NodeRun {
   status: NodeRunStatus
@@ -77,16 +119,29 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   onNodesChange: (changes) => set({ nodes: applyNodeChanges(changes, get().nodes) }),
   onEdgesChange: (changes) => set({ edges: applyEdgeChanges(changes, get().edges) }),
   onConnect: (conn) => {
-    // Edges into a loopInternal port (Forge's `feedback`) are the real
-    // Temper→Forge back-edge that DEFINES the loop. The edge carries both the
-    // verdict (each iteration) AND the loop config in its data — click to edit.
-    const target = get().nodes.find((n) => n.id === conn.target)
+    const nodes = get().nodes
+    const target = nodes.find((n) => n.id === conn.target)
     const port = target && getSpec(target.data.kind).inputs.find((p) => `in:${p.id}` === conn.targetHandle)
-    // The back-edge carries its own loop config (mode + cap) — click it to edit.
-    const edge = port?.loopInternal
-      ? { ...conn, type: 'feedback', data: { loopBackEdge: true, mode: 'until-pass', maxIterations: 3 } }
-      : { ...conn }
-    set({ edges: addEdge(edge, get().edges) })
+    if (!port?.loopInternal) {
+      set({ edges: addEdge({ ...conn }, get().edges) })
+      return
+    }
+    // An edge into a loopInternal `feedback` port is a loop back-edge; it carries
+    // the loop config (mode + cap) in its data — click the arrow to edit.
+    let edges = addEdge(
+      { ...conn, type: 'feedback', data: { loopBackEdge: true, mode: 'until-pass', maxIterations: 3 } },
+      get().edges,
+    )
+    // Auto-complete the loop: a back-edge alone isn't a cycle (the engine would
+    // ignore it). If nothing yet feeds back (no forward path target→…→source),
+    // add the return edge (source.out → target's first compatible input) so the
+    // wired out→feedback becomes a REAL, runnable, iterating loop.
+    const fwd = edges.filter((e) => e.type !== 'feedback')
+    if (conn.source && conn.target && !forwardReaches(conn.target, conn.source, fwd)) {
+      const ret = buildReturnEdge(nodes, conn.target, conn.source)
+      if (ret) edges = addEdge(ret, edges)
+    }
+    set({ edges })
   },
 
   addNode: (kind, position, parentId) => {

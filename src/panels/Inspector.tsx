@@ -143,6 +143,31 @@ function ModelField({
   )
 }
 
+/** Skill picker — a dropdown of available skills (~/.claude/skills first, then bundled). */
+function SkillField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [skills, setSkills] = useState<string[]>([])
+  useEffect(() => {
+    fetch('/api/skills')
+      .then((r) => r.json())
+      .then((d) => setSkills((d.skills ?? []) as string[]))
+      .catch(() => setSkills([]))
+  }, [])
+  // Keep a previously-set skill visible even if it isn't currently on disk.
+  const opts = value && !skills.includes(value) ? [value, ...skills] : skills
+  return (
+    <select className={inputCls} value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="" className="bg-card">
+        — none —
+      </option>
+      {opts.map((s) => (
+        <option key={s} value={s} className="bg-card">
+          {s}
+        </option>
+      ))}
+    </select>
+  )
+}
+
 /** Grid of selectable symbols for a Custom Agent node. */
 function IconField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
@@ -695,6 +720,8 @@ export function Inspector({ onClose }: { onClose?: () => void }) {
           </select>
         )
       }
+      case 'skill':
+        return <SkillField value={String(value ?? '')} onChange={set} />
       case 'multiselect':
         return (
           <MultiSelectField

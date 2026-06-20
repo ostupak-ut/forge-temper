@@ -6,6 +6,7 @@ import { resolvePrompt } from '../run/resolvePrompt'
 import { loadSkillText } from '../skills/skillLoader'
 import { getProvider } from '../providers/registry'
 import { runStore } from '../persistence/runStore'
+import { getGraphAware, getGraphTemplate } from '../persistence/settingsStore'
 import { verifyProtoDir } from '../verify/discParser'
 import { buildGraphContext } from './graphContext'
 
@@ -153,6 +154,7 @@ export function effectiveWorkingDir(node: GraphNode, nodes: GraphNode[], edges: 
   if (own) return own
   if (node.data.kind === 'forge') return `papers/${node.id}`
   if (node.data.kind === 'custom') return `papers/${node.id}`
+  if (node.data.kind === 'assemble') return `papers/${node.id}`
   if (node.data.kind === 'temper') {
     // Find the upstream FORGE among ALL incoming edges (not just the first one,
     // which may be an InfoCard/other input) so temper reads forge's proto/.
@@ -256,7 +258,8 @@ export async function runOneNode(
 
   // forge/temper do real agentic work (write files, run sympy/latexmk),
   // so they need an agentic provider. Prose/other nodes run on any provider.
-  const needsAgent = node.data.kind === 'forge' || node.data.kind === 'temper'
+  const needsAgent =
+    node.data.kind === 'forge' || node.data.kind === 'temper' || node.data.kind === 'assemble'
   if (needsAgent && provider.kind !== 'agent') {
     throw new Error(
       `${node.data.kind} needs an agentic provider (e.g. Claude Code) — ${provider.label} is chat-only for now.`,
@@ -287,7 +290,11 @@ export async function runOneNode(
   // Make the node self-aware: prepend an auto-generated map of where it sits in
   // the pipeline to its system prompt, then the user's own system append.
   const userAppend = typeof cfg.systemAppend === 'string' && cfg.systemAppend ? cfg.systemAppend : ''
-  const systemAppend = [buildGraphContext(node, nodes, edges), userAppend].filter(Boolean).join('\n\n---\n\n')
+  const graphContext = buildGraphContext(node, nodes, edges, {
+    enabled: getGraphAware(),
+    template: getGraphTemplate() ?? undefined,
+  })
+  const systemAppend = [graphContext, userAppend].filter(Boolean).join('\n\n---\n\n')
 
   const runResult = await provider.run({
     runId,

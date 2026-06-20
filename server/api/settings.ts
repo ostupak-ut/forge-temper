@@ -1,18 +1,26 @@
 import type { FastifyInstance } from 'fastify'
 import {
   getCliSettings,
+  getGraphAware,
+  getGraphTemplate,
   getKey,
   getWorkspaceSetting,
   keyPresence,
   setCliSettings,
+  setGraphSettings,
   setKeys,
   setWorkspaceSetting,
   type CliName,
   type ProviderKey,
 } from '../persistence/settingsStore'
 import { DEFAULT_WORKSPACE_DIR, getWorkspaceDir } from '../config'
+import { DEFAULT_GRAPH_TEMPLATE } from '../engine/graphContext'
+import { listSkills } from '../skills/skillLoader'
 
 export async function settingsRoutes(app: FastifyInstance) {
+  // Available skills for the node Skill picker (~/.claude/skills + bundled).
+  app.get('/api/skills', async () => ({ skills: listSkills() }))
+
   // Presence booleans only — never return secret values.
   app.get('/api/settings', async () => ({
     keys: keyPresence(),
@@ -20,12 +28,17 @@ export async function settingsRoutes(app: FastifyInstance) {
     workspaceOverride: getWorkspaceSetting(),
     defaultWorkspaceDir: DEFAULT_WORKSPACE_DIR,
     cli: getCliSettings(),
+    graphAware: getGraphAware(),
+    graphTemplate: getGraphTemplate() ?? DEFAULT_GRAPH_TEMPLATE,
+    defaultGraphTemplate: DEFAULT_GRAPH_TEMPLATE,
   }))
 
   app.post('/api/settings', async (req) => {
     const body = (req.body ?? {}) as Partial<Record<ProviderKey, string>> & {
       workspaceDir?: unknown
       cli?: Partial<Record<CliName, string>>
+      graphAware?: unknown
+      graphTemplate?: unknown
     }
     if ('workspaceDir' in body) {
       const wd = body.workspaceDir
@@ -36,7 +49,15 @@ export async function settingsRoutes(app: FastifyInstance) {
       setWorkspaceSetting(wd === null ? null : (wd as string))
     }
     if (body.cli && typeof body.cli === 'object') setCliSettings(body.cli)
-    const { workspaceDir: _wd, cli: _cli, ...keyBody } = body
+    if ('graphAware' in body || 'graphTemplate' in body) {
+      setGraphSettings({
+        ...(typeof body.graphAware === 'boolean' ? { aware: body.graphAware } : {}),
+        ...('graphTemplate' in body
+          ? { template: body.graphTemplate === null ? null : String(body.graphTemplate ?? '') }
+          : {}),
+      })
+    }
+    const { workspaceDir: _wd, cli: _cli, graphAware: _ga, graphTemplate: _gt, ...keyBody } = body
     setKeys(keyBody as Partial<Record<ProviderKey, string>>)
     return {
       ok: true,
@@ -45,6 +66,9 @@ export async function settingsRoutes(app: FastifyInstance) {
       workspaceOverride: getWorkspaceSetting(),
       defaultWorkspaceDir: DEFAULT_WORKSPACE_DIR,
       cli: getCliSettings(),
+      graphAware: getGraphAware(),
+      graphTemplate: getGraphTemplate() ?? DEFAULT_GRAPH_TEMPLATE,
+      defaultGraphTemplate: DEFAULT_GRAPH_TEMPLATE,
     }
   })
 

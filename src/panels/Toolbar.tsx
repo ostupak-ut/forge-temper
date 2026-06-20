@@ -231,9 +231,9 @@ export function Toolbar() {
         <button
           className={btn}
           onClick={onDemoRun}
-          title="Preview only — animates edges/status. To really run a node, use the ▶ on the node (or in the Inspector)."
+          title="Dry run — walks the flow order and animates edges/status WITHOUT calling any agent (no tokens spent). To really run, use Run Graph, or the ▶ on a node."
         >
-          <Play className="size-3.5" /> Animate
+          <Play className="size-3.5" /> Dry Run
         </button>
         {currentRunId ? (
           <button

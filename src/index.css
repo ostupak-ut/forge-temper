@@ -67,28 +67,28 @@ body {
   }
 }
 
-/* React Flow zoom/fit controls: make the +/- icons visible on the dark theme */
+/* React Flow zoom/fit controls: theme-aware so +/- repaint in light mode too. */
 .react-flow__controls {
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
   border-radius: 6px;
   overflow: hidden;
 }
 .react-flow__controls-button {
-  background: #121826;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgb(var(--card));
+  border-bottom: 1px solid rgb(var(--border) / 0.15);
   width: 26px;
   height: 26px;
 }
 .react-flow__controls-button:hover {
-  background: #1e293b;
+  background: rgb(var(--field));
 }
 .react-flow__controls-button svg {
-  fill: #cbd5e1;
+  fill: rgb(var(--fg) / 0.7);
   max-width: 14px;
   max-height: 14px;
 }
 
 /* MiniMap surface tint */
 .react-flow__minimap {
-  background: #0b0f17;
+  background: rgb(var(--bg));
 }

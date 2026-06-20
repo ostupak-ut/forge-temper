@@ -66,10 +66,9 @@ function agentFields(opts: { skill?: string; promptHelp?: string }): FieldDescri
     {
       key: 'skill',
       label: 'Skill',
-      kind: 'text',
+      kind: 'skill',
       group: 'Prompt',
-      placeholder: 'skill name',
-      help: 'Claude Code skill this node leans on.',
+      help: 'Skill this node runs with — your ~/.claude/skills/ first, then bundled. Create a skill at home and it shows up here.',
     },
     {
       key: 'workingDir',
@@ -321,20 +320,34 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
   assemble: {
     kind: 'assemble',
     label: 'Assemble',
-    description: 'Concatenates preamble + body + theorems + lit + bib into a compilable main.tex.',
+    description:
+      'Stitches the verified theorems + written sections + bibliography into one compilable main.tex and runs latexmk → PDF. An agent node — pick any agentic provider (Claude Code / Codex / OpenRouter-agent).',
     color: '#64748b',
     icon: FileStack,
     inputs: [
       { id: 'section', type: 'section', label: 'sections' },
       { id: 'verified', type: 'verified', label: 'verified' },
       { id: 'bib', type: 'bib', label: 'bib' },
+      { id: 'context', type: 'any', label: 'context' },
     ],
     outputs: [{ id: 'tex', type: 'file', label: 'main.tex' }],
     fields: [
+      ...agentFields({
+        promptHelp:
+          'Integrates {{verified}} + {{section}} + {{bib}} into a single compilable main.tex and runs latexmk. Needs an agentic provider (Bash to compile).',
+      }),
       { key: 'outputPath', label: 'Output path', kind: 'path', group: 'Output', placeholder: 'main.tex' },
       { key: 'runLatexmk', label: 'Compile (latexmk)', kind: 'boolean', group: 'Output' },
     ],
-    defaultConfig: { outputPath: 'main.tex', runLatexmk: true },
+    defaultConfig: {
+      ...agentDefaults(''),
+      prompt:
+        'Assemble ONE compilable LaTeX paper from the wired inputs, then compile it to a PDF.\n\n' +
+        'Verified results:\n{{verified}}\n\nWritten sections:\n{{section}}\n\nBibliography:\n{{bib}}\n\n' +
+        'Write a single self-contained main.tex in your working directory (a proper preamble — prefer Libertine + newtxmath if available) that integrates the verified results and the section prose in a sensible order, with the bibliography. Then run `latexmk -pdf main.tex`, fix any compile errors, and recompile until it builds. Report the final PDF path.',
+      outputPath: 'main.tex',
+      runLatexmk: true,
+    },
     reactFlowType: 'ftNode',
   },
 

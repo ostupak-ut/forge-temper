@@ -36,6 +36,25 @@ function portOf(
   return ports.find((p) => handleId(dir, p.id) === handle) ?? null
 }
 
+/** Is `goal` reachable from `start` following forward (non-feedback) edges only? */
+function forwardReaches(start: string, goal: string, fwd: Edge[]): boolean {
+  if (start === goal) return true
+  const seen = new Set<string>()
+  const stack = [start]
+  while (stack.length) {
+    const cur = stack.pop()!
+    for (const e of fwd) {
+      if (e.source !== cur) continue
+      if (e.target === goal) return true
+      if (!seen.has(e.target)) {
+        seen.add(e.target)
+        stack.push(e.target)
+      }
+    }
+  }
+  return false
+}
+
 /** Would adding source→target close a cycle in the (outer) graph? */
 function wouldCreateCycle(nodes: FtNode[], edges: Edge[], source: string, target: string): boolean {
   if (source === target) return true
@@ -105,13 +124,17 @@ export function FlowCanvas() {
     [addNode, addPresetNode, setSelected, screenToFlowPosition],
   )
 
-  const displayEdges = useMemo(
-    () =>
-      edges.map((e) => {
+  const displayEdges = useMemo(() => {
+    const fwd = edges.filter((e) => e.type !== 'feedback')
+    return edges.map((e) => {
         const active = activeEdgeIds.includes(e.id)
         if (e.type === 'feedback') {
-          // Self-styled custom edge; just pass the active flag through.
-          return { ...e, data: { ...(e.data ?? {}), active } }
+          // A feedback edge is only a REAL loop if there's a forward path from its
+          // target back to its source (so the source genuinely re-runs the target).
+          // Otherwise it's a stray edge into a feedback port — flag it so the edge
+          // renders an honest "no loop" warning instead of a fake "loop ≤N".
+          const isLoop = forwardReaches(e.target, e.source, fwd)
+          return { ...e, data: { ...(e.data ?? {}), active, isLoop } }
         }
         const src = portOf(nodes, e.source, 'out', e.sourceHandle ?? null)?.type
         const color = src ? PORT_COLOR[src] : '#64748b'
@@ -121,9 +144,8 @@ export function FlowCanvas() {
           style: { stroke: active ? color : '#475569', strokeWidth: active ? 2.5 : 1.5 },
           markerEnd: { type: MarkerType.ArrowClosed, color: active ? color : '#475569' },
         }
-      }),
-    [edges, activeEdgeIds, nodes],
-  )
+      })
+  }, [edges, activeEdgeIds, nodes])
 
   return (
     <ReactFlow
@@ -154,6 +176,7 @@ export function FlowCanvas() {
       selectionMode={SelectionMode.Partial}
       panOnDrag={[1, 2]}
       fitView
+      fitViewOptions={{ maxZoom: 1, padding: 0.4 }}
       minZoom={0.2}
       maxZoom={2}
     >

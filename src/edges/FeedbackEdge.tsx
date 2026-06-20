@@ -19,11 +19,16 @@ export function FeedbackEdge(props: EdgeProps) {
   const nodes = useGraphStore((s) => s.nodes)
   const cfg = (data ?? {}) as {
     active?: boolean
+    isLoop?: boolean
     mode?: string
     maxIterations?: number
     arcLift?: number
     arcShiftX?: number
   }
+  // A feedback edge only LOOPS when a forward path closes the cycle (computed in
+  // FlowCanvas). Without it, this is a stray edge into a feedback port — draw an
+  // honest amber "not a loop" hint, not a fake animated "loop ≤N".
+  const isLoop = cfg.isLoop !== false
 
   // Auto apex: clear the topmost node under the arc's horizontal span.
   const spanMin = Math.min(sourceX, targetX) - 60
@@ -43,6 +48,8 @@ export function FeedbackEdge(props: EdgeProps) {
   const apexY = baselineY - lift
   const midX = (sourceX + targetX) / 2
   const dx = Math.max(60, Math.abs(sourceX - targetX) * 0.22)
+  // Loop AND not-a-loop use the SAME arc, so a not-a-loop edge looks and drags
+  // exactly like a loop — only color + label differ (amber + a warning).
   const path = `M ${sourceX},${sourceY} C ${sourceX + dx + shiftX},${apexY} ${targetX - dx + shiftX},${apexY} ${targetX},${targetY}`
 
   // Grab handle sits at the curve's visual peak.
@@ -88,15 +95,16 @@ export function FeedbackEdge(props: EdgeProps) {
   const run = useGraphStore((s) => s.runState[target])
   const iteration = run?.iteration
   const dist = run?.verdict?.distribution
-  const running = cfg.active || iteration != null
+  const running = isLoop && (cfg.active || iteration != null)
 
-  const color = selected ? '#fecdd3' : '#fb7185'
+  const color = !isLoop ? (selected ? '#fcd34d' : '#f59e0b') : selected ? '#fecdd3' : '#fb7185'
   const width = selected ? 3.5 : running ? 3 : 2.5
-  const markerId = running ? 'ft-fb-arrow-on' : 'ft-fb-arrow-off'
+  const markerId = !isLoop ? 'ft-fb-arrow-warn' : running ? 'ft-fb-arrow-on' : 'ft-fb-arrow-off'
 
   const cap = cfg.maxIterations ?? 3
-  const label =
-    iteration != null
+  const label = !isLoop
+    ? '⚠ not a loop — add a forward edge back'
+    : iteration != null
       ? `iter ${iteration}${dist ? ` · 🟢${dist.v} 🔵${dist.p} 🟠${dist.h} 🔴${dist.c}` : ''}`
       : `↩ loop ${cfg.mode === 'until-count' ? '×' : '≤'}${cap}`
 
@@ -118,7 +126,12 @@ export function FeedbackEdge(props: EdgeProps) {
       <EdgeLabelRenderer>
         <div
           style={{ position: 'absolute', transform: `translate(-50%,-50%) translate(${labelX}px,${labelY}px)` }}
-          className="pointer-events-none whitespace-nowrap rounded-full border border-rose-400/40 bg-rose-500/25 px-2 py-0.5 text-[10px] font-medium text-rose-100 shadow-sm"
+          className={
+            'pointer-events-none whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-medium shadow-sm ' +
+            (isLoop
+              ? 'border-rose-400/40 bg-rose-500/25 text-rose-100'
+              : 'border-amber-400/50 bg-amber-500/25 text-amber-100')
+          }
         >
           {label}
         </div>
