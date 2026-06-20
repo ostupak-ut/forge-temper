@@ -86,8 +86,10 @@ export async function runLoop(
       break
     }
 
-    // A missing/invalid verdict counts as NOT correct → retry the source once.
-    if (!iterVerdict) {
+    // until-pass only: a missing/invalid verdict counts as NOT correct → retry
+    // the source once. (until-count ignores the verdict and just runs N times,
+    // so custom-agent loops with no verdict iterate the full count.)
+    if (untilPass && !iterVerdict) {
       const source = bodyNodes.find((n) => n.id === loop.verdictSourceId)
       if (source && !aborted(signal)) {
         const retry = await deps.runOneNode(source, nodes, edges, runId, signal, {
@@ -117,11 +119,11 @@ export async function runLoop(
       ...(iterVerdict?.protoDir ? { protoDir: iterVerdict.protoDir } : {}),
     })
 
-    if (!iterVerdict) {
+    if (untilPass && !iterVerdict) {
       reason = 'no-verdict'
       break
     }
-    if (untilPass && iterVerdict.allCorrect) {
+    if (untilPass && iterVerdict?.allCorrect) {
       converged = true
       reason = 'converged'
       break
