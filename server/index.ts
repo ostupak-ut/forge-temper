@@ -26,7 +26,7 @@ async function getClaudeVersion(): Promise<string | undefined> {
 /** Whether the codex CLI is runnable (bundled in the IDE extension, CODEX_BIN, or PATH). */
 async function getCodexAvailable(): Promise<boolean> {
   try {
-    await pexec(resolveCodexBin(), ['--version'], { timeout: 5000 })
+    await pexec(resolveCodexBin(), ['--version'], { timeout: 20000 })
     return true
   } catch {
     return false

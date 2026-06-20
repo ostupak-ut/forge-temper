@@ -55,8 +55,11 @@ export function resolveCodexBin(): string {
         continue
       }
       for (const plat of plats) {
-        const cand = path.join(binDir, plat, 'codex')
-        if (existsSync(cand)) return cand
+        // Windows ships codex.exe; macOS/Linux ship a bare `codex`.
+        for (const name of ['codex.exe', 'codex']) {
+          const cand = path.join(binDir, plat, name)
+          if (existsSync(cand)) return cand
+        }
       }
     }
   }

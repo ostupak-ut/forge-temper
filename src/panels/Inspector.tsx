@@ -115,10 +115,10 @@ const GROUP_PRIORITY: Record<string, number> = {
 // any other the CLI/API accepts. OpenRouter fetches its list live instead.
 const SUGGESTED_MODELS: Record<string, { id: string; name: string }[]> = {
   codex: [
-    { id: 'gpt-5.1-codex', name: 'GPT-5.1 Codex' },
-    { id: 'gpt-5.1-codex-mini', name: 'GPT-5.1 Codex Mini' },
-    { id: 'gpt-5.1', name: 'GPT-5.1' },
-    { id: 'o4-mini', name: 'o4-mini' },
+    { id: 'gpt-5.5', name: 'GPT-5.5' },
+    { id: 'gpt-5.4', name: 'GPT-5.4' },
+    { id: 'gpt-5.4-mini', name: 'GPT-5.4 Mini' },
+    { id: 'gpt-5.3-codex-spark', name: 'GPT-5.3 Codex Spark' },
   ],
   'anthropic-harness': [
     { id: 'claude-opus-4-8', name: 'Opus 4.8' },

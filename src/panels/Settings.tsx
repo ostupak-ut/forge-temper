@@ -311,39 +311,6 @@ export function Settings({ onClose }: { onClose: () => void }) {
 
         <div className="mb-4 space-y-2 rounded-lg border border-border/15 bg-fg/[0.03] p-3">
           <div className="flex items-center gap-2 text-xs font-medium text-fg/80">
-            <Terminal className="size-4 text-sky-300" />
-            CLI paths
-          </div>
-          <p className="text-[11px] text-fg/40">
-            Auto-detected by default (Claude Code on PATH; Codex from the IDE extension). Override only if yours live
-            elsewhere.
-          </p>
-          {(['codex', 'claude'] as const).map((name) => (
-            <div key={name} className="space-y-1">
-              <label className="block text-[11px] capitalize text-fg/55">{name} CLI path</label>
-              <input
-                type="text"
-                spellCheck={false}
-                placeholder="auto-detected"
-                value={cli[name]}
-                onChange={(e) => setCli((c) => ({ ...c, [name]: e.target.value }))}
-                className="w-full rounded-md border border-border/15 bg-card px-2 py-1 font-mono text-xs text-fg/90 outline-none focus:border-temper"
-              />
-            </div>
-          ))}
-          <div className="flex justify-end">
-            <button
-              onClick={saveCli}
-              disabled={savingCli}
-              className="rounded-md bg-sky-500/20 px-3 py-1 text-xs text-sky-300 hover:bg-sky-500/30 disabled:opacity-50"
-            >
-              {savingCli ? 'Saving…' : 'Save CLI paths'}
-            </button>
-          </div>
-        </div>
-
-        <div className="mb-4 space-y-2 rounded-lg border border-border/15 bg-fg/[0.03] p-3">
-          <div className="flex items-center gap-2 text-xs font-medium text-fg/80">
             <Network className="size-4 text-temper" />
             Agent self-awareness
           </div>
@@ -388,6 +355,39 @@ export function Settings({ onClose }: { onClose: () => void }) {
               className="rounded-md bg-temper/20 px-3 py-1 text-xs text-temper hover:bg-temper/30 disabled:opacity-50"
             >
               {savingGraph ? 'Saving…' : 'Save template'}
+            </button>
+          </div>
+        </div>
+
+        <div className="mb-4 space-y-2 rounded-lg border border-border/15 bg-fg/[0.03] p-3">
+          <div className="flex items-center gap-2 text-xs font-medium text-fg/80">
+            <Terminal className="size-4 text-sky-300" />
+            CLI paths
+          </div>
+          <p className="text-[11px] text-fg/40">
+            Auto-detected by default (Claude Code on PATH; Codex from the IDE extension). Override only if yours live
+            elsewhere.
+          </p>
+          {(['codex', 'claude'] as const).map((name) => (
+            <div key={name} className="space-y-1">
+              <label className="block text-[11px] capitalize text-fg/55">{name} CLI path</label>
+              <input
+                type="text"
+                spellCheck={false}
+                placeholder="auto-detected"
+                value={cli[name]}
+                onChange={(e) => setCli((c) => ({ ...c, [name]: e.target.value }))}
+                className="w-full rounded-md border border-border/15 bg-card px-2 py-1 font-mono text-xs text-fg/90 outline-none focus:border-temper"
+              />
+            </div>
+          ))}
+          <div className="flex justify-end">
+            <button
+              onClick={saveCli}
+              disabled={savingCli}
+              className="rounded-md bg-sky-500/20 px-3 py-1 text-xs text-sky-300 hover:bg-sky-500/30 disabled:opacity-50"
+            >
+              {savingCli ? 'Saving…' : 'Save CLI paths'}
             </button>
           </div>
         </div>
