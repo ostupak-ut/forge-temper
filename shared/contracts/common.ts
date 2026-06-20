@@ -57,6 +57,7 @@ export type Field = z.infer<typeof Field>
  *   bib      — bibliography entries
  *   file     — a file/folder staged into inputs/
  *   control  — execution/loop control signal
+ *   any      — universal port for the Custom Agent node (wireable anywhere)
  */
 export const PortType = z.enum([
   'idea',
@@ -68,6 +69,7 @@ export const PortType = z.enum([
   'bib',
   'file',
   'control',
+  'any',
 ])
 export type PortType = z.infer<typeof PortType>
 

@@ -1,0 +1,53 @@
+% =====================================================================
+% forge :: proofs.tex  (v0.2)
+% Proof tier (Appendix A). myproof sketches for the building blocks in
+% prototype.tex. Each myproof takes #1 = env type, #2 = \ref{...}.
+% Whole section is \footnotesize. \input{proofs} after \appendix.
+% =====================================================================
+\section{Proof sketches}\label{app:proofs}
+
+\footnotesize
+
+\begin{myproof}{Proposition}{\ref{prop:exist}}
+Fix $(S_A,S_B)$ and let $F=S_A\cup S_B$ be the contested fronts. Each player's
+strategy is a distribution over budget vectors on $F$ summing to $1$. The
+per-front win payoff is upper semicontinuous in own spend and the strategy sets
+are compact and convex after the usual mixing, so a fixed point of the
+best-response correspondence exists by Glicksberg. Check \checkmark\ (symbolic):
+for $|F|=1$ the game collapses to ``spend everything,'' a degenerate equilibrium,
+consistent with the general statement.
+\end{myproof}
+
+\begin{myproof}{Lemma}{\ref{lem:concentrate}}
+Suppose a player opens $k$ fronts and splits the budget so some front receives
+$b<\kappa$. The marginal win probability contributed by that front is at most
+$b$ (it is outspent with probability $\ge 1-b$), while keeping it open costs
+$\kappa>b$. Dropping the front and reinforcing another raises payoff, so no
+equilibrium has such a front. Iterating, every open front receives $\ge\kappa$,
+forcing $k\kappa\le$ (effective spend) and hence
+$k\le\lceil 1/(2\kappa)\rceil$. Check \checkmark\ (symbolic): the
+threshold $b=\kappa$ equates marginal gain and cost, the standard first-order
+balance.
+\end{myproof}
+
+\begin{myproof}{Corollary}{\ref{cor:sparse}}
+Each player opens at most $m^\star=\lceil 1/(2\kappa)\rceil$ fronts by
+Lemma~\ref{lem:concentrate}, so the contested union $S_A\cup S_B$ has at most
+$2m^\star$ fronts; all other fronts receive zero spend from both players and are
+not in the support. Thus the support size is $\le 2\lceil 1/(2\kappa)\rceil =
+O(1/\kappa)$, independent of $n$. Check \checkmark\ (symbolic): substituting
+$\kappa=1/(2m)$ gives support $\le 2m$, exactly the union of two $m$-front sets.
+\end{myproof}
+
+\begin{myproof}{Theorem}{\ref{thm:char}}
+Restrict to symmetric profiles. By Corollary~\ref{cor:sparse} the support is
+sparse, and by Proposition~\ref{prop:exist} the reduced game on any fixed
+symmetric $m^\star$-front union has an equilibrium. On symmetric fronts the
+unique symmetric second-stage solution is the uniform marginal on
+$[0,2/m^\star]$ per front (the classic Blotto marginal), whose mean
+$1/m^\star$ summed over $m^\star$ fronts exhausts the budget. The selection
+stage is then indifferent across which $m^\star$ fronts to open, pinning
+$m^\star=\lceil 1/(2\kappa)\rceil$. Check \checkmark\ (symbolic): per-front mean
+$\int_0^{2/m^\star}\!x\,(m^\star/2)\,dx = 1/m^\star$, so total spend $=1$.
+(Conjectural: uniqueness and asymmetric equilibria are not established here.)
+\end{myproof}

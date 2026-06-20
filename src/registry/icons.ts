@@ -1,0 +1,70 @@
+import {
+  Sparkles,
+  Bot,
+  Brain,
+  Rocket,
+  Wand2,
+  FlaskConical,
+  Microscope,
+  Calculator,
+  PenTool,
+  Search,
+  Scale,
+  Bug,
+  Zap,
+  Star,
+  Atom,
+  Sigma,
+  Lightbulb,
+  BookOpen,
+  Hammer,
+  Cog,
+  Compass,
+  Feather,
+  GraduationCap,
+  Shield,
+  Cpu,
+  Code,
+  Flame,
+  Ghost,
+  type LucideIcon,
+} from 'lucide-react'
+
+/** Symbols a Custom Agent node can wear (chosen per-instance in the Inspector). */
+export const AGENT_ICONS: Record<string, LucideIcon> = {
+  Sparkles,
+  Bot,
+  Brain,
+  Rocket,
+  Wand2,
+  FlaskConical,
+  Microscope,
+  Calculator,
+  PenTool,
+  Search,
+  Scale,
+  Bug,
+  Zap,
+  Star,
+  Atom,
+  Sigma,
+  Lightbulb,
+  BookOpen,
+  Hammer,
+  Cog,
+  Compass,
+  Feather,
+  GraduationCap,
+  Shield,
+  Cpu,
+  Code,
+  Flame,
+  Ghost,
+}
+
+export const ICON_NAMES = Object.keys(AGENT_ICONS)
+
+/** A node's chosen symbol (config.symbol) if valid, else the spec's default icon. */
+export function resolveNodeIcon(symbol: unknown, fallback: LucideIcon): LucideIcon {
+  return (typeof symbol === 'string' && AGENT_ICONS[symbol]) || fallback
+}

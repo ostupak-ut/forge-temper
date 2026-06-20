@@ -1,20 +1,38 @@
 import { existsSync, readFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const SKILLS_DIR = path.join(os.homedir(), '.claude', 'skills')
+// Bundled skills live in ./bundled/<name>/SKILL.md next to this file, so the app
+// is SELF-CONTAINED and needs NO ~/.claude/skills install. Resolve the dir from
+// this module's own URL (works under tsx without a build/dist step).
+const BUNDLED_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'bundled')
+const USER_SKILLS_DIR = path.join(os.homedir(), '.claude', 'skills')
+
+// Precedence: PREFER bundled, FALL BACK to the user's ~/.claude/skills. Set
+// FORGE_TEMPER_PREFER_USER_SKILLS=1 to flip it (handy when iterating on a skill
+// in ~/.claude/skills without re-vendoring into bundled/).
+const PREFER_USER = process.env.FORGE_TEMPER_PREFER_USER_SKILLS === '1'
+
 const cache = new Map<string, string | null>()
 
 /**
- * Read a skill's instructions from ~/.claude/skills/<name>/SKILL.md (frontmatter
- * stripped). We INJECT this as the system prompt rather than invoking the Skill
- * tool — headless `query()` hangs on the Skill tool, and inlining means "skill =
- * prompt + tools", so it works on any agentic provider.
+ * Read a skill's instructions (frontmatter stripped). We INJECT this as the
+ * system prompt rather than invoking the Skill tool — headless `query()` hangs
+ * on the Skill tool, and inlining means "skill = prompt + tools", so it works on
+ * any agentic provider.
+ *
+ * Looks in bundled/<name>/SKILL.md first, then ~/.claude/skills/<name>/SKILL.md
+ * (order flipped by FORGE_TEMPER_PREFER_USER_SKILLS=1). Returns null gracefully
+ * when the skill is installed in neither place (e.g. olehwrites).
  */
 export function loadSkillText(name: string): string | null {
   if (cache.has(name)) return cache.get(name)!
-  const file = path.join(SKILLS_DIR, name, 'SKILL.md')
-  if (!existsSync(file)) {
+  const bundled = path.join(BUNDLED_DIR, name, 'SKILL.md')
+  const user = path.join(USER_SKILLS_DIR, name, 'SKILL.md')
+  const candidates = PREFER_USER ? [user, bundled] : [bundled, user]
+  const file = candidates.find(existsSync)
+  if (!file) {
     cache.set(name, null)
     return null
   }

@@ -62,6 +62,7 @@ export function FlowCanvas() {
   const onConnect = useGraphStore((s) => s.onConnect)
   const addNode = useGraphStore((s) => s.addNode)
   const setSelected = useGraphStore((s) => s.setSelected)
+  const setSelectedEdge = useGraphStore((s) => s.setSelectedEdge)
 
   const { screenToFlowPosition } = useReactFlow()
 
@@ -85,22 +86,9 @@ export function FlowCanvas() {
       const kind = e.dataTransfer.getData(DRAG_MIME) as NodeKind
       if (!kind) return
       const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY })
-
-      // Drop into a Loop container if released over one.
-      const group = nodes.find((n) => {
-        if (n.data.kind !== 'loop') return false
-        const w = (n.style?.width as number) ?? 520
-        const h = (n.style?.height as number) ?? 320
-        return pos.x >= n.position.x && pos.x <= n.position.x + w && pos.y >= n.position.y && pos.y <= n.position.y + h
-      })
-
-      if (group && kind !== 'loop') {
-        addNode(kind, { x: pos.x - group.position.x, y: pos.y - group.position.y }, group.id)
-      } else {
-        addNode(kind, pos)
-      }
+      addNode(kind, pos)
     },
-    [nodes, addNode, screenToFlowPosition],
+    [addNode, screenToFlowPosition],
   )
 
   const displayEdges = useMemo(
@@ -134,7 +122,11 @@ export function FlowCanvas() {
       onConnect={onConnect}
       isValidConnection={isValidConnection}
       onNodeClick={(_, n) => setSelected(n.id)}
-      onPaneClick={() => setSelected(null)}
+      onEdgeClick={(_, e) => setSelectedEdge(e.id)}
+      onPaneClick={() => {
+        setSelected(null)
+        setSelectedEdge(null)
+      }}
       onDrop={onDrop}
       onDragOver={(e) => {
         e.preventDefault()

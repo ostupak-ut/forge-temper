@@ -4,6 +4,9 @@ dist-ssr
 *.local
 *.log
 
+# scratch dump of OpenRouter model ids (the picker fetches them live)
+openrouter-models.txt
+
 # local run-history DB + paper workspaces
 .forge-temper/
 workspace/
@@ -13,3 +16,10 @@ workspace/
 .vscode/*
 !.vscode/extensions.json
 .idea
+
+# secrets-guard — never commit credentials, even if dropped under a bundled dir.
+# NOTE: this does NOT ignore server/skills/bundled/ itself; that tree MUST be
+# committed so the app runs with no ~/.claude/skills install.
+**/.credentials.json
+**/*.key
+**/.env

@@ -6,6 +6,7 @@ export * from './forge'
 export * from './temper'
 export * from './prose'
 export * from './run'
+export * from './loop'
 
 /**
  * Convert a Zod schema to a JSON Schema for the Agent SDK's

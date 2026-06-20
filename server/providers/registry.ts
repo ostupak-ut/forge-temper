@@ -1,11 +1,17 @@
 import type { Provider } from './types'
 import { claudeCodeProvider } from './claudeCode'
+import { codexProvider } from './codex'
 import { openrouterProvider } from './openrouter'
+import { anthropicHarnessProvider } from './anthropicHarness'
+import { openrouterAgentProvider } from './openrouterAgent'
 
-/** All registered providers. Codex / OpenAI / Anthropic-direct get added here. */
+/** All registered providers. OpenAI-direct / Anthropic-direct get added here. */
 const PROVIDERS: Record<string, Provider> = {
   [claudeCodeProvider.id]: claudeCodeProvider,
+  [codexProvider.id]: codexProvider,
   [openrouterProvider.id]: openrouterProvider,
+  [anthropicHarnessProvider.id]: anthropicHarnessProvider,
+  [openrouterAgentProvider.id]: openrouterAgentProvider,
 }
 
 export const DEFAULT_PROVIDER = 'claude-code'

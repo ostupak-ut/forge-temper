@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Download, FilePlus2, Play, Save, SaveAll, Sparkles, Trash2, Upload } from 'lucide-react'
+import { CirclePlay, Download, FilePlus2, Play, Save, SaveAll, Sparkles, Square, Trash2, Upload } from 'lucide-react'
 import { useGraphStore } from '@/store/graphStore'
 import { buildStarterGraph } from '@/io/sampleGraph'
+import { runGraph, stopCurrentRun } from '@/run/runController'
 import { downloadGraph, loadGraphFromFile, serializeGraph } from '@/io/serialize'
 import { deleteFlow, listFlows, loadFlow, saveFlow, type FlowMeta } from '@/io/flowsApi'
 import type { FtNode } from '@/store/graphStore'
@@ -35,6 +36,7 @@ const btn =
 
 export function Toolbar() {
   const setGraph = useGraphStore((s) => s.setGraph)
+  const currentRunId = useGraphStore((s) => s.currentRunId)
   const [flows, setFlows] = useState<FlowMeta[]>([])
   const [current, setCurrent] = useState<string | null>(() => localStorage.getItem(CURRENT_KEY))
   const [dirtyMsg, setDirtyMsg] = useState<string>('')
@@ -104,7 +106,7 @@ export function Toolbar() {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  })
+  }, [current])
 
   const onDemoRun = async () => {
     const st = useGraphStore.getState()
@@ -195,6 +197,23 @@ export function Toolbar() {
         >
           <Play className="size-3.5" /> Animate
         </button>
+        {currentRunId ? (
+          <button
+            className={btn + ' !border-red-400/40 !bg-red-500/15 text-red-200 hover:!bg-red-500/25'}
+            onClick={() => void stopCurrentRun()}
+            title="Stop the running graph"
+          >
+            <Square className="size-3.5" /> Stop
+          </button>
+        ) : (
+          <button
+            className={btn + ' !border-emerald-400/40 !bg-emerald-500/15 text-emerald-200 hover:!bg-emerald-500/25'}
+            onClick={() => void runGraph()}
+            title="Really run the whole graph: forge → temper, iterating the loop until all-correct or the cap."
+          >
+            <CirclePlay className="size-3.5" /> Run Graph
+          </button>
+        )}
       </div>
     </div>
   )

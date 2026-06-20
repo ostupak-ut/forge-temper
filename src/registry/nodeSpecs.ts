@@ -3,17 +3,20 @@ import {
   Thermometer,
   IdCard,
   FileInput,
-  Repeat,
   PenLine,
   BookText,
   FileStack,
   Lightbulb,
+  Sparkles,
 } from 'lucide-react'
 import type { FieldDescriptor, NodeKind, NodeSpec } from './types'
 
 const PROVIDER_OPTIONS = [
-  { label: 'Claude Code — agent (runs skills)', value: 'claude-code' },
-  { label: 'OpenRouter — models (no skills)', value: 'openrouter' },
+  { label: '★ Claude Code — subscription, no key (recommended)', value: 'claude-code' },
+  { label: 'Codex — ChatGPT/Codex subscription (CLI)', value: 'codex' },
+  { label: 'Anthropic Harness — API key, no CLI', value: 'anthropic-harness' },
+  { label: 'OpenRouter — agent (tool-capable models)', value: 'openrouter-agent' },
+  { label: 'OpenRouter — chat (no tools/skills)', value: 'openrouter' },
 ]
 
 const MODEL_OPTIONS = [
@@ -75,7 +78,7 @@ function agentFields(opts: { skill?: string; promptHelp?: string }): FieldDescri
   ]
 }
 
-const agentDefaults = (skill: string) => ({
+const agentDefaults = (skill = '') => ({
   provider: 'claude-code',
   model: 'inherit',
   effort: 'high',
@@ -180,12 +183,14 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
     inputs: [
       { id: 'idea', type: 'idea', label: 'idea', required: true },
       { id: 'inputs', type: 'file', label: 'inputs' },
+      { id: 'context', type: 'any', label: 'context' },
       { id: 'feedback', type: 'report', label: 'feedback', loopInternal: true },
     ],
     outputs: [{ id: 'paper', type: 'paper', label: 'paper' }],
     fields: agentFields({
       skill: 'forge',
-      promptHelp: 'e.g. "forge a prototype of this idea: {{idea}}". {{temper_report}} is injected on loop re-runs.',
+      promptHelp:
+        'e.g. "forge a prototype of this idea: {{idea}}". Wire in as many ideas/files/anything as you like — multiples merge, and anything you don’t reference is auto-appended. {{temper_report}} is injected on loop re-runs.',
     }),
     defaultConfig: { ...agentDefaults('forge'), prompt: 'forge a prototype of this idea:\n\n{{idea}}' },
     reactFlowType: 'ftNode',
@@ -197,7 +202,10 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
     description: 'Verifies the skeleton algebraically + numerically; emits a structured verdict.',
     color: '#3b9ae8',
     icon: Thermometer,
-    inputs: [{ id: 'paper', type: 'paper', label: 'paper', required: true }],
+    inputs: [
+      { id: 'paper', type: 'paper', label: 'paper', required: true },
+      { id: 'context', type: 'any', label: 'context' },
+    ],
     outputs: [
       { id: 'report', type: 'report', label: 'report' },
       { id: 'verified', type: 'verified', label: 'verified' },
@@ -219,46 +227,54 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
     reactFlowType: 'ftNode',
   },
 
-  loop: {
-    kind: 'loop',
-    label: 'Loop',
-    description: 'Repeats the contained Forge↔Temper body until correct or a max-iteration cap.',
-    color: '#f43f5e',
-    icon: Repeat,
-    inputs: [{ id: 'in', type: 'card', label: 'in' }],
-    outputs: [{ id: 'verified', type: 'verified', label: 'verified' }],
+  custom: {
+    kind: 'custom',
+    label: 'Custom Agent',
+    description:
+      'Freely-wireable agent — your name, prompt, provider/model, tool scope, file input. Drops anywhere, including onto the Forge↔Temper loop.',
+    color: '#22d3ee',
+    icon: Sparkles,
+    inputs: [
+      { id: 'in', type: 'any', label: 'in' },
+      { id: 'inputs', type: 'file', label: 'files' },
+      { id: 'feedback', type: 'report', label: 'feedback', loopInternal: true },
+    ],
+    outputs: [{ id: 'out', type: 'any', label: 'out' }],
     fields: [
       {
-        key: 'mode',
-        label: 'Mode',
-        kind: 'select',
-        group: 'Loop',
+        key: 'symbol',
+        label: 'Symbol',
+        kind: 'icon',
+        group: 'Agent',
+        help: 'Pick an icon for this agent — it shows on the node and in this panel.',
+      },
+      ...agentFields({
+        promptHelp:
+          'Your instructions. {{in}} = upstream output, {{files}} = staged files, {{temper_report}}/{{feedback}} on loop re-runs.',
+      }),
+      {
+        key: 'toolScope',
+        label: 'Tool scope',
+        kind: 'multiselect',
+        group: 'Execution',
         options: [
-          { label: 'Until count (fixed iterations)', value: 'until-count' },
-          { label: 'Until pass (smart: temper all-correct)', value: 'until-pass' },
+          { label: 'Read', value: 'Read' },
+          { label: 'Write', value: 'Write' },
+          { label: 'Edit', value: 'Edit' },
+          { label: 'Bash', value: 'Bash' },
+          { label: 'Glob', value: 'Glob' },
+          { label: 'Grep', value: 'Grep' },
         ],
-      },
-      {
-        key: 'maxIterations',
-        label: 'Max iterations',
-        kind: 'number',
-        group: 'Loop',
-        min: 1,
-        max: 20,
-        step: 1,
-        help: 'Always a hard cap, even in smart mode.',
-      },
-      {
-        key: 'approveEachIteration',
-        label: 'Approve each iteration',
-        kind: 'boolean',
-        group: 'Loop',
-        help: 'Pause for your OK before the next Forge round.',
+        help: 'Which tools this agent may use (bypassPermissions still applies).',
       },
     ],
-    defaultConfig: { mode: 'until-pass', maxIterations: 3, approveEachIteration: false },
-    isContainer: true,
-    reactFlowType: 'ftGroup',
+    defaultConfig: {
+      ...agentDefaults(''),
+      symbol: 'Sparkles',
+      prompt: '',
+      toolScope: ['Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep'],
+    },
+    reactFlowType: 'ftNode',
   },
 
   body: {
@@ -270,6 +286,7 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
     inputs: [
       { id: 'verified', type: 'verified', label: 'verified', required: true },
       { id: 'card', type: 'card', label: 'card' },
+      { id: 'context', type: 'any', label: 'context' },
     ],
     outputs: [{ id: 'section', type: 'section', label: 'section' }],
     fields: agentFields({ skill: 'olehwrites' }),
@@ -286,6 +303,7 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
     inputs: [
       { id: 'verified', type: 'verified', label: 'verified' },
       { id: 'bib', type: 'bib', label: 'bib' },
+      { id: 'context', type: 'any', label: 'context' },
     ],
     outputs: [
       { id: 'section', type: 'section', label: 'section' },
