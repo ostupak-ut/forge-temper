@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { createReadStream } from 'node:fs'
-import { mkdir, readdir, stat, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { WORKSPACE_DIR } from '../config'
 
@@ -60,6 +60,10 @@ export async function fsRoutes(app: FastifyInstance) {
       items.sort((a, b) => (a.dir === b.dir ? a.name.localeCompare(b.name) : a.dir ? -1 : 1))
       return { root: path.basename(WORKSPACE_DIR), path: rel, items }
     } catch (e) {
+      // A not-yet-created dir (e.g. library/ before first upload) = empty, not an error.
+      if ((e as NodeJS.ErrnoException)?.code === 'ENOENT') {
+        return { root: path.basename(WORKSPACE_DIR), path: rel, items: [] as FsEntry[] }
+      }
       return reply.code(404).send({ error: String((e as Error)?.message ?? e) })
     }
   })
@@ -73,14 +77,41 @@ export async function fsRoutes(app: FastifyInstance) {
     return createReadStream(file)
   })
 
-  // Upload a file from the OS picker → stored under workspace/_uploads, returns its workspace path.
+  // Upload a binary body. `path` = full workspace-relative destination (each
+  // segment sanitized; enables folder uploads that preserve structure under
+  // library/); falls back to the legacy `name` → _uploads/<name>.
   app.post('/api/fs/upload', async (req, reply) => {
-    const name = String((req.query as { name?: string }).name ?? 'file').replace(/[^\w.\- ]/g, '_')
+    const q = req.query as { name?: string; path?: string }
     const body = req.body
     if (!Buffer.isBuffer(body)) return reply.code(400).send({ error: 'expected binary body' })
-    const destDir = path.join(WORKSPACE_DIR, '_uploads')
-    await mkdir(destDir, { recursive: true })
-    await writeFile(path.join(destDir, name), body)
-    return { path: `_uploads/${name}`, size: body.length }
+    let rel: string
+    if (q.path) {
+      rel = q.path
+        .split('/')
+        .map((s) => s.replace(/[^\w.\- ]/g, '_'))
+        .filter(Boolean)
+        .join('/')
+    } else {
+      rel = `_uploads/${String(q.name ?? 'file').replace(/[^\w.\- ]/g, '_')}`
+    }
+    const dest = safeResolve(rel)
+    if (!dest) return reply.code(400).send({ error: 'path outside workspace' })
+    await mkdir(path.dirname(dest), { recursive: true })
+    await writeFile(dest, body)
+    return { path: rel, size: body.length }
+  })
+
+  // Delete a file or folder (recursive), confined to the workspace.
+  app.delete('/api/fs/delete', async (req, reply) => {
+    const rel = String((req.query as { path?: string }).path ?? '').trim()
+    const target = safeResolve(rel)
+    if (!target || !rel) return reply.code(400).send({ error: 'invalid path' })
+    if (target === path.resolve(WORKSPACE_DIR)) return reply.code(400).send({ error: 'refusing to delete workspace root' })
+    try {
+      await rm(target, { recursive: true, force: true })
+      return { ok: true }
+    } catch (e) {
+      return reply.code(500).send({ error: String((e as Error)?.message ?? e) })
+    }
   })
 }

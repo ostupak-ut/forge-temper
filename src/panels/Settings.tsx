@@ -4,9 +4,9 @@ import { KeyRound, X } from 'lucide-react'
 type Presence = { openrouter: boolean; openai: boolean; anthropic: boolean }
 
 const PROVIDERS: { key: keyof Presence; label: string; hint: string }[] = [
-  { key: 'openrouter', label: 'OpenRouter', hint: 'openrouter.ai/keys — unlocks 400+ models' },
-  { key: 'openai', label: 'OpenAI', hint: 'for the OpenAI / Codex providers (coming)' },
-  { key: 'anthropic', label: 'Anthropic', hint: 'for direct Claude API (coming)' },
+  { key: 'openrouter', label: 'OpenRouter', hint: 'openrouter.ai/keys — unlocks OpenRouter agent + chat (400+ models)' },
+  { key: 'anthropic', label: 'Anthropic', hint: 'unlocks the Anthropic Harness provider (run forge/temper with no CLI)' },
+  { key: 'openai', label: 'OpenAI', hint: 'for a future OpenAI-direct provider (not yet wired)' },
 ]
 
 export function Settings({ onClose }: { onClose: () => void }) {

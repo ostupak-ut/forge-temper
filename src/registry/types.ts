@@ -12,6 +12,7 @@ export type NodeKind =
   | 'body'
   | 'literature'
   | 'assemble'
+  | 'warehouse'
 
 /** A typed input/output port on a node. */
 export interface Port {
@@ -35,6 +36,9 @@ export type FieldKind =
   | 'model'
   | 'multiselect'
   | 'icon'
+  | 'color'
+  | 'files'
+  | 'warehouse'
 
 export interface FieldOption {
   label: string

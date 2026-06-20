@@ -9,6 +9,7 @@ import { flowRoutes } from './api/flows'
 import { runRoutes } from './api/runs'
 import { settingsRoutes } from './api/settings'
 import { keyPresence } from './persistence/settingsStore'
+import { resolveCodexBin } from './run/codexRunner'
 
 const pexec = promisify(execFile)
 
@@ -19,6 +20,16 @@ async function getClaudeVersion(): Promise<string | undefined> {
     return stdout.trim()
   } catch {
     return undefined
+  }
+}
+
+/** Whether the codex CLI is runnable (bundled in the IDE extension, CODEX_BIN, or PATH). */
+async function getCodexAvailable(): Promise<boolean> {
+  try {
+    await pexec(resolveCodexBin(), ['--version'], { timeout: 5000 })
+    return true
+  } catch {
+    return false
   }
 }
 
@@ -38,12 +49,20 @@ await app.register(settingsRoutes)
 
 app.get('/api/health', async () => {
   const claude = await getClaudeVersion()
+  const [codex, keys] = [await getCodexAvailable(), keyPresence()]
   return {
     ok: true,
     service: 'forge-temper-server',
     workspace: WORKSPACE_DIR,
     claude,
-    providers: { 'claude-code': !!claude, openrouter: keyPresence().openrouter },
+    // Availability per provider id — the UI lists only providers that can run.
+    providers: {
+      'claude-code': !!claude,
+      codex,
+      'anthropic-harness': keys.anthropic,
+      'openrouter-agent': keys.openrouter,
+      openrouter: keys.openrouter,
+    },
   }
 })
 

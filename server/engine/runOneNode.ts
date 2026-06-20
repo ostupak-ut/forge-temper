@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs'
+import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { WORKSPACE_DIR } from '../config'
 import { emitEvent } from '../run/runEvents'
@@ -7,6 +7,7 @@ import { loadSkillText } from '../skills/skillLoader'
 import { getProvider } from '../providers/registry'
 import { runStore } from '../persistence/runStore'
 import { verifyProtoDir } from '../verify/discParser'
+import { buildGraphContext } from './graphContext'
 
 /**
  * Per-node execution, extracted from the old runs.ts `mode:'single'` IIFE so the
@@ -87,11 +88,21 @@ export function allowedToolsFor(kind: string, cfg?: Record<string, unknown>): st
 /** Data-source node kinds whose value comes from their CONFIG (not a run). */
 const DATA_KINDS = new Set(['idea', 'file', 'infocard'])
 
+/** Workspace-relative file/folder paths a Files node references (multi + legacy single). */
+function filePathsOf(cfg: Record<string, unknown> | undefined): string[] {
+  const out: string[] = []
+  if (Array.isArray(cfg?.paths)) {
+    for (const p of cfg!.paths as unknown[]) if (typeof p === 'string' && p.trim()) out.push(p.trim())
+  }
+  if (typeof cfg?.path === 'string' && cfg.path.trim()) out.push(cfg.path.trim())
+  return out
+}
+
 /** Text a data-source node contributes when wired into a downstream node. */
 function valueForSource(src: GraphNode): string {
   const c = src.data.config ?? {}
   if (src.data.kind === 'idea') return String(c.text ?? '')
-  if (src.data.kind === 'file') return String(c.path ?? '')
+  if (src.data.kind === 'file') return filePathsOf(c).join('\n')
   if (src.data.kind === 'infocard') {
     return [c.title && `Title: ${c.title}`, c.abstract && `Abstract: ${c.abstract}`]
       .filter(Boolean)
@@ -178,22 +189,23 @@ function resolveCwd(workingDir: string): string {
   return dir
 }
 
-/** Stage any wired File nodes into <cwd>/inputs/ so the skill reads them. */
+/** Stage wired Files nodes into <cwd>/inputs/ — each referenced file/folder, recursively. */
 function stageFileInputs(node: GraphNode, nodes: GraphNode[], edges: GraphEdge[], cwd: string): void {
   for (const e of edges) {
     if (e.target !== node.id) continue
     const src = nodes.find((n) => n.id === e.source)
     if (src?.data.kind !== 'file') continue
-    const fp = typeof src.data.config?.path === 'string' ? src.data.config.path.trim() : ''
-    if (!fp) continue
-    const abs = path.isAbsolute(fp) ? fp : path.resolve(WORKSPACE_DIR, fp)
-    const stageAs =
-      (typeof src.data.config?.stageAs === 'string' && src.data.config.stageAs.trim()) || path.basename(abs)
-    try {
-      mkdirSync(path.join(cwd, 'inputs'), { recursive: true })
-      copyFileSync(abs, path.join(cwd, 'inputs', stageAs))
-    } catch {
-      /* missing/locked file — skip */
+    for (const fp of filePathsOf(src.data.config)) {
+      const abs = path.isAbsolute(fp) ? fp : path.resolve(WORKSPACE_DIR, fp)
+      try {
+        if (!existsSync(abs)) continue
+        mkdirSync(path.join(cwd, 'inputs'), { recursive: true })
+        const dest = path.join(cwd, 'inputs', path.basename(abs))
+        if (statSync(abs).isDirectory()) cpSync(abs, dest, { recursive: true })
+        else copyFileSync(abs, dest)
+      } catch {
+        /* missing/locked path — skip */
+      }
     }
   }
 }
@@ -211,6 +223,10 @@ export async function runOneNode(
   signal: AbortSignal,
   opts: RunOneOpts = {},
 ): Promise<RunOneResult> {
+  // The Warehouse node is a result sink, not an agent — it archives upstream
+  // artifacts into an indexed pile instead of running a provider.
+  if (node.data.kind === 'warehouse') return archiveWarehouse(node, nodes, edges, runId)
+
   const cfg = node.data.config ?? {}
   const cwd = resolveCwd(effectiveWorkingDir(node, nodes, edges))
 
@@ -267,6 +283,11 @@ export async function runOneNode(
     }
   }
 
+  // Make the node self-aware: prepend an auto-generated map of where it sits in
+  // the pipeline to its system prompt, then the user's own system append.
+  const userAppend = typeof cfg.systemAppend === 'string' && cfg.systemAppend ? cfg.systemAppend : ''
+  const systemAppend = [buildGraphContext(node, nodes, edges), userAppend].filter(Boolean).join('\n\n---\n\n')
+
   const runResult = await provider.run({
     runId,
     nodeId: node.id,
@@ -274,7 +295,7 @@ export async function runOneNode(
     prompt,
     model: typeof cfg.model === 'string' ? cfg.model : undefined,
     effort: typeof cfg.effort === 'string' ? cfg.effort : undefined,
-    systemAppend: typeof cfg.systemAppend === 'string' && cfg.systemAppend ? cfg.systemAppend : undefined,
+    systemAppend: systemAppend || undefined,
     cwd,
     allowedTools: allowedToolsFor(node.data.kind, cfg),
     skillText: skillTextForChat,
@@ -314,4 +335,88 @@ export async function runOneNode(
   }
 
   return { ok: runResult.ok, result: runResult.result, sessionId: runResult.sessionId, verdict }
+}
+
+// ---------------------------------------------------------------------------
+// Warehouse — an output sink that piles upstream artifacts into indexed runs.
+// ---------------------------------------------------------------------------
+
+const EXT_FILTER: Record<string, string[] | null> = {
+  pdf: ['.pdf'],
+  md: ['.md'],
+  tex: ['.tex'],
+  all: null,
+}
+/** LaTeX build junk never worth piling, even under "Everything". */
+const JUNK_EXT = new Set(['.aux', '.fls', '.fdb_latexmk', '.log', '.out', '.toc', '.synctex', '.gz'])
+
+async function archiveWarehouse(
+  node: GraphNode,
+  nodes: GraphNode[],
+  edges: GraphEdge[],
+  runId: string,
+): Promise<RunOneResult> {
+  emitEvent(runId, { type: 'status', nodeId: node.id, status: 'running' })
+  runStore.upsertNodeRun({ runId, nodeId: node.id, kind: node.data.kind, status: 'running' })
+
+  const cfg = node.data.config ?? {}
+  const collect = typeof cfg.collect === 'string' ? cfg.collect : 'pdf'
+  const exts = collect in EXT_FILTER ? EXT_FILTER[collect] : EXT_FILTER.pdf
+  const matches = (name: string): boolean => {
+    const ext = path.extname(name).toLowerCase()
+    return exts ? exts.includes(ext) : !JUNK_EXT.has(ext)
+  }
+
+  const base = path.join(WORKSPACE_DIR, 'warehouse', node.id)
+  mkdirSync(base, { recursive: true })
+  const prior = readdirSync(base).filter((d) => /^run-\d+/.test(d))
+  const idx = String(prior.length + 1).padStart(3, '0')
+  const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
+  const runDir = path.join(base, `run-${idx}-${ts}`)
+
+  let count = 0
+  const srcEdges = edges.filter((e) => e.target === node.id && e.type !== 'feedback' && !e.data?.loopBackEdge)
+  for (const e of srcEdges) {
+    const src = nodes.find((n) => n.id === e.source)
+    if (!src || DATA_KINDS.has(src.data.kind)) continue // data nodes produce no artifacts
+    const srcCwd = resolveCwd(effectiveWorkingDir(src, nodes, edges))
+    const label = String(src.data.label || src.data.kind).replace(/[^\w.\- ]/g, '_')
+    // proto/ holds the prototype artifacts; fall back to the working dir top-level.
+    for (const d of [path.join(srcCwd, 'proto'), srcCwd]) {
+      if (!existsSync(d)) continue
+      let names: string[] = []
+      try {
+        names = readdirSync(d)
+      } catch {
+        continue
+      }
+      const hits = names.filter((nm) => {
+        try {
+          return statSync(path.join(d, nm)).isFile() && matches(nm)
+        } catch {
+          return false
+        }
+      })
+      if (!hits.length) continue
+      mkdirSync(runDir, { recursive: true })
+      for (const nm of hits) {
+        try {
+          // Flat naming (label__file) so the gallery lists a run in one call.
+          copyFileSync(path.join(d, nm), path.join(runDir, `${label}__${nm}`))
+          count++
+        } catch {
+          /* skip */
+        }
+      }
+      break // proto/ preferred — don't also pull from the cwd top-level
+    }
+  }
+
+  const rel = path.relative(WORKSPACE_DIR, runDir).split(path.sep).join('/')
+  const result =
+    count > 0 ? `Archived ${count} file(s) → ${rel}` : `Nothing matched (collect: ${collect}) — no run folder created.`
+  emitEvent(runId, { type: 'result', nodeId: node.id, ok: true, result })
+  emitEvent(runId, { type: 'status', nodeId: node.id, status: 'done' })
+  runStore.upsertNodeRun({ runId, nodeId: node.id, status: 'done', result, structured: { dir: rel, count } })
+  return { ok: true, result }
 }

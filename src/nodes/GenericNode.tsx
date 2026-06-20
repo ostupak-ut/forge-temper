@@ -75,6 +75,8 @@ function PortRow({ port, dir }: { port: Port; dir: 'in' | 'out' }) {
 function GenericNodeImpl({ id, data, selected }: NodeProps<FtNode>) {
   const spec = getSpec(data.kind)
   const Icon = resolveNodeIcon((data.config as { symbol?: unknown })?.symbol, spec.icon)
+  const cfgColor = (data.config as { color?: unknown })?.color
+  const accent = typeof cfgColor === 'string' && cfgColor ? cfgColor : spec.color
   const run = useGraphStore((s) => s.runState[id])
   const deleteNode = useGraphStore((s) => s.deleteNode)
   const status: NodeRunStatus = run?.status ?? 'idle'
@@ -92,9 +94,9 @@ function GenericNodeImpl({ id, data, selected }: NodeProps<FtNode>) {
       {/* header */}
       <div
         className="flex items-center gap-2 rounded-t-xl px-3 py-2"
-        style={{ background: `${spec.color}22`, borderBottom: `1px solid ${spec.color}55` }}
+        style={{ background: `${accent}22`, borderBottom: `1px solid ${accent}55` }}
       >
-        <Icon className="size-4 shrink-0" style={{ color: spec.color }} />
+        <Icon className="size-4 shrink-0" style={{ color: accent }} />
         <span className="truncate text-sm font-medium text-white/90">{data.label}</span>
         <span className={cn('ml-auto size-2 rounded-full', STATUS_DOT[status])} title={status} />
         {runnable &&

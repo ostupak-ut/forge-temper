@@ -1,23 +1,31 @@
-import { BaseEdge, EdgeLabelRenderer, type EdgeProps } from '@xyflow/react'
+import { useRef, useState } from 'react'
+import { BaseEdge, EdgeLabelRenderer, useReactFlow, type EdgeProps } from '@xyflow/react'
 import { useGraphStore } from '@/store/graphStore'
 
 /**
- * The Temper → Forge loop-feedback link — THIS ARROW IS THE LOOP. Drawn
- * animated/dashed/rose, arcing cleanly OVER the top of the body. It targets
- * Forge's `loopInternal` port; its `data` carries the loop config (mode +
- * maxIterations), edited by clicking the arrow (see EdgeInspector).
+ * The Temper → Forge loop-feedback link — THIS ARROW IS THE LOOP. Animated/dashed/
+ * rose, arching over the body. Its `data` carries the loop config (mode +
+ * maxIterations, edited via EdgeInspector) AND an optional custom arc position
+ * (`arcLift` / `arcShiftX`): SELECT the edge and DRAG the grab handle at the apex
+ * to reposition the arc; double-click the handle to snap back to auto.
  *
- * The label surfaces the LIVE loop state from the store's runState of the
- * back-edge TARGET node (Forge): `iter N · 🟢v 🔵p 🟠h 🔴c`, and the configured
- * cap when idle.
+ * The label shows live loop state from the back-edge TARGET (Forge):
+ * `iter N · 🟢v 🔵p 🟠h 🔴c` running, and the configured cap when idle.
  */
 export function FeedbackEdge(props: EdgeProps) {
-  const { sourceX, sourceY, targetX, targetY, target, data, selected } = props
-
-  // Arch HIGH above every node the loop spans, so the arrow clearly wraps around
-  // the whole body instead of hiding behind the boxes. Find the topmost node
-  // under the arc's horizontal span and clear it by a comfortable margin.
+  const { id, sourceX, sourceY, targetX, targetY, target, data, selected } = props
+  const { getZoom } = useReactFlow()
+  const updateEdgeData = useGraphStore((s) => s.updateEdgeData)
   const nodes = useGraphStore((s) => s.nodes)
+  const cfg = (data ?? {}) as {
+    active?: boolean
+    mode?: string
+    maxIterations?: number
+    arcLift?: number
+    arcShiftX?: number
+  }
+
+  // Auto apex: clear the topmost node under the arc's horizontal span.
   const spanMin = Math.min(sourceX, targetX) - 60
   const spanMax = Math.max(sourceX, targetX) + 60
   let topY = Math.min(sourceY, targetY)
@@ -26,22 +34,63 @@ export function FeedbackEdge(props: EdgeProps) {
     const cx = n.position.x + w / 2
     if (cx >= spanMin && cx <= spanMax) topY = Math.min(topY, n.position.y)
   }
-  const apexY = topY - 96
-  const dx = Math.max(60, Math.abs(sourceX - targetX) * 0.22)
-  const path = `M ${sourceX},${sourceY} C ${sourceX + dx},${apexY} ${targetX - dx},${apexY} ${targetX},${targetY}`
-  const labelX = (sourceX + targetX) / 2
-  const labelY = apexY - 4
-  const cfg = (data ?? {}) as { active?: boolean; mode?: string; maxIterations?: number }
-  const active = Boolean(cfg.active)
+  const baselineY = Math.min(sourceY, targetY)
+  const autoLift = baselineY - (topY - 96)
 
-  // Pull live loop progress for the back-edge target (Forge).
+  // Custom position overrides auto when set (by dragging the handle).
+  const lift = typeof cfg.arcLift === 'number' ? cfg.arcLift : autoLift
+  const shiftX = typeof cfg.arcShiftX === 'number' ? cfg.arcShiftX : 0
+  const apexY = baselineY - lift
+  const midX = (sourceX + targetX) / 2
+  const dx = Math.max(60, Math.abs(sourceX - targetX) * 0.22)
+  const path = `M ${sourceX},${sourceY} C ${sourceX + dx + shiftX},${apexY} ${targetX - dx + shiftX},${apexY} ${targetX},${targetY}`
+
+  // Grab handle sits at the curve's visual peak.
+  const handleX = midX + shiftX
+  const handleY = 0.125 * (sourceY + targetY) + 0.75 * apexY
+  const labelX = handleX
+  // Sit just above the curve's VISUAL peak (handleY), not the higher control apex.
+  const labelY = handleY - 14
+
+  const drag = useRef<{ x: number; y: number } | null>(null)
+  const [grabbing, setGrabbing] = useState(false)
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    ;(e.target as Element).setPointerCapture?.(e.pointerId)
+    drag.current = { x: e.clientX, y: e.clientY }
+    setGrabbing(true)
+  }
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!drag.current) return
+    const z = getZoom() || 1
+    const ddx = (e.clientX - drag.current.x) / z
+    const ddy = (e.clientY - drag.current.y) / z
+    drag.current = { x: e.clientX, y: e.clientY }
+    // Read the freshest values from the store to avoid stale-closure drift.
+    const ed = useGraphStore.getState().edges.find((x) => x.id === id)
+    const d = (ed?.data ?? {}) as { arcLift?: number; arcShiftX?: number }
+    const curLift = typeof d.arcLift === 'number' ? d.arcLift : autoLift
+    const curShift = typeof d.arcShiftX === 'number' ? d.arcShiftX : 0
+    updateEdgeData(id, { arcLift: curLift - ddy, arcShiftX: curShift + ddx })
+  }
+  const onPointerUp = (e: React.PointerEvent) => {
+    drag.current = null
+    setGrabbing(false)
+    ;(e.target as Element).releasePointerCapture?.(e.pointerId)
+  }
+  const onReset = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    updateEdgeData(id, { arcLift: undefined, arcShiftX: undefined })
+  }
+
   const run = useGraphStore((s) => s.runState[target])
   const iteration = run?.iteration
   const dist = run?.verdict?.distribution
-  const running = active || iteration != null
+  const running = cfg.active || iteration != null
 
-  // Always bright + bold so the loop reads at a glance (it's the headline edge).
-  const color = selected ? '#fecdd3' : running ? '#fb7185' : '#fb7185'
+  const color = selected ? '#fecdd3' : '#fb7185'
   const width = selected ? 3.5 : running ? 3 : 2.5
   const markerId = running ? 'ft-fb-arrow-on' : 'ft-fb-arrow-off'
 
@@ -73,6 +122,28 @@ export function FeedbackEdge(props: EdgeProps) {
         >
           {label}
         </div>
+        {selected && (
+          <div
+            className="nodrag nopan"
+            title="Drag to reposition the loop arc · double-click to reset"
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onDoubleClick={onReset}
+            style={{
+              position: 'absolute',
+              transform: `translate(-50%,-50%) translate(${handleX}px,${handleY}px)`,
+              pointerEvents: 'all',
+              cursor: grabbing ? 'grabbing' : 'grab',
+              width: 16,
+              height: 16,
+              borderRadius: 9999,
+              background: '#fb7185',
+              border: '2px solid #fecdd3',
+              boxShadow: '0 0 0 4px rgba(251,113,133,0.25)',
+            }}
+          />
+        )}
       </EdgeLabelRenderer>
     </>
   )

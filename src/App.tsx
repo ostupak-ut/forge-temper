@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ReactFlowProvider } from '@xyflow/react'
-import { Anvil, FolderTree, Settings as SettingsIcon, Thermometer } from 'lucide-react'
+import { Anvil, FolderTree, PanelRightOpen, Settings as SettingsIcon, Thermometer } from 'lucide-react'
 import { FlowCanvas } from '@/canvas/FlowCanvas'
 import { Palette } from '@/panels/Palette'
 import { Inspector } from '@/panels/Inspector'
@@ -50,6 +50,7 @@ export function App() {
   useAutosave()
   const [filesOpen, setFilesOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [inspectorOpen, setInspectorOpen] = useState(true)
   return (
     <ReactFlowProvider>
       <div className="flex h-full flex-col">
@@ -74,7 +75,17 @@ export function App() {
           <div className="relative min-w-0 flex-1">
             <FlowCanvas />
           </div>
-          <Inspector />
+          {inspectorOpen ? (
+            <Inspector onClose={() => setInspectorOpen(false)} />
+          ) : (
+            <button
+              onClick={() => setInspectorOpen(true)}
+              title="Open inspector"
+              className="flex w-7 shrink-0 items-center justify-center border-l border-white/10 bg-[#0d1320] text-white/40 transition hover:bg-white/5 hover:text-white/80"
+            >
+              <PanelRightOpen className="size-4" />
+            </button>
+          )}
         </div>
 
         {filesOpen && <FileManager onClose={() => setFilesOpen(false)} />}

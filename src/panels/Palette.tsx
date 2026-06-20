@@ -1,13 +1,18 @@
 import { useReactFlow } from '@xyflow/react'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, X } from 'lucide-react'
 import { ALL_KINDS, getSpec } from '@/registry/nodeSpecs'
+import { resolveNodeIcon } from '@/registry/icons'
 import { useGraphStore } from '@/store/graphStore'
+import { usePresets } from '@/io/customPresets'
 import { DRAG_MIME } from '@/canvas/FlowCanvas'
 import type { NodeKind } from '@/registry/types'
 
 export function Palette() {
   const addNode = useGraphStore((s) => s.addNode)
+  const addPresetNode = useGraphStore((s) => s.addPresetNode)
   const setSelected = useGraphStore((s) => s.setSelected)
+  const presets = usePresets((s) => s.presets)
+  const removePreset = usePresets((s) => s.remove)
   const { screenToFlowPosition } = useReactFlow()
 
   // Center of the visible canvas, with a small jitter so repeat clicks don't stack.
@@ -36,7 +41,7 @@ export function Palette() {
   }
 
   return (
-    <div className="flex h-full w-44 shrink-0 flex-col gap-1 border-r border-white/10 bg-[#0d1320] p-2">
+    <div className="flex h-full w-44 shrink-0 flex-col gap-1 overflow-auto border-r border-white/10 bg-[#0d1320] p-2">
       <button
         onClick={newCustomAgent}
         title="Create a freely-wireable custom agent — then name it and edit its prompt in the Inspector."
@@ -45,7 +50,45 @@ export function Palette() {
         <Sparkles className="size-4 shrink-0" />
         <span className="truncate">New Custom Agent</span>
       </button>
-      <p className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-white/30">Nodes</p>
+
+      {presets.length > 0 && (
+        <>
+          <p className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-white/30">My Agents</p>
+          {presets.map((p) => {
+            const Icon = resolveNodeIcon(p.symbol, Sparkles)
+            return (
+              <div
+                key={p.id}
+                className="group flex items-center gap-2 rounded-lg border border-cyan-400/20 bg-cyan-400/[0.05] px-2 py-1.5 text-xs text-white/85 transition hover:border-cyan-400/40 hover:bg-cyan-400/10"
+              >
+                <button
+                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                  title={`Add “${p.name}”`}
+                  onClick={() => {
+                    const id = addPresetNode('custom', centerPos(), p.name, p.config)
+                    setSelected(id)
+                  }}
+                >
+                  <Icon
+                    className="size-4 shrink-0"
+                    style={{ color: typeof p.config.color === 'string' ? (p.config.color as string) : '#22d3ee' }}
+                  />
+                  <span className="truncate">{p.name}</span>
+                </button>
+                <button
+                  className="rounded p-0.5 text-white/25 opacity-0 transition hover:bg-red-500/20 hover:text-red-300 group-hover:opacity-100"
+                  title="Remove from Palette"
+                  onClick={() => removePreset(p.id)}
+                >
+                  <X className="size-3" />
+                </button>
+              </div>
+            )
+          })}
+        </>
+      )}
+
+      <p className="px-1 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-white/30">Nodes</p>
       {ALL_KINDS.map((kind) => {
         const spec = getSpec(kind)
         const Icon = spec.icon
@@ -64,7 +107,7 @@ export function Palette() {
         )
       })}
       <p className="mt-auto px-1 pt-2 text-[10px] leading-tight text-white/25">
-        Click to add, or drag onto the canvas. Drop Forge/Temper inside a Loop to iterate them.
+        Click to add, or drag onto the canvas. Save a configured Custom Agent (★ in its Inspector) to reuse it here.
       </p>
     </div>
   )

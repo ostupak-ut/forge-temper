@@ -1,5 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
-import { Play, Repeat, Square, Trash2, Upload } from 'lucide-react'
+import {
+  Archive,
+  BookmarkPlus,
+  ChevronRight,
+  File as FileIcon,
+  Folder,
+  FolderPlus,
+  PanelRightClose,
+  Play,
+  Plus,
+  RefreshCw,
+  Repeat,
+  Square,
+  Trash2,
+  Upload,
+  X,
+} from 'lucide-react'
+import { usePresets } from '@/io/customPresets'
 import type { Edge } from '@xyflow/react'
 import { useGraphStore } from '@/store/graphStore'
 import { getSpec } from '@/registry/nodeSpecs'
@@ -208,10 +225,12 @@ function EdgeInspector({
   edge,
   updateEdgeData,
   onDelete,
+  onClose,
 }: {
   edge: Edge
   updateEdgeData: (id: string, patch: Record<string, unknown>) => void
   onDelete: () => void
+  onClose?: () => void
 }) {
   const isLoop = edge.type === 'feedback' || Boolean((edge.data as { loopBackEdge?: unknown })?.loopBackEdge)
   const data = (edge.data ?? {}) as { mode?: string; maxIterations?: number }
@@ -227,6 +246,11 @@ function EdgeInspector({
         >
           <Trash2 className="size-4" />
         </button>
+        {onClose && (
+          <button onClick={onClose} title="Close panel" className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white/80">
+            <PanelRightClose className="size-4" />
+          </button>
+        )}
       </div>
       <div className="flex-1 space-y-4 overflow-auto p-3">
         {isLoop ? (
@@ -274,7 +298,272 @@ function EdgeInspector({
   )
 }
 
-export function Inspector() {
+const COLOR_SWATCHES = [
+  '#22d3ee', '#0ea5e9', '#8b5cf6', '#a855f7', '#e8743b', '#f97316',
+  '#22c55e', '#14b8a6', '#eab308', '#f43f5e', '#ec4899', '#94a3b8',
+]
+
+/** Accent-color picker for a Custom Agent node: preset swatches + a native picker. */
+function ColorField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {COLOR_SWATCHES.map((c) => (
+        <button
+          key={c}
+          onClick={() => onChange(c)}
+          title={c}
+          className={'size-5 rounded-full border transition ' + (value === c ? 'border-white ring-2 ring-white/40' : 'border-white/20 hover:border-white/50')}
+          style={{ background: c }}
+        />
+      ))}
+      <input
+        type="color"
+        value={/^#[0-9a-f]{6}$/i.test(value) ? value : '#22d3ee'}
+        onChange={(e) => onChange(e.target.value)}
+        title="Custom color"
+        className="ml-1 size-6 cursor-pointer rounded border border-white/20 bg-transparent"
+      />
+    </div>
+  )
+}
+
+interface FsLite {
+  name: string
+  dir: boolean
+  rel: string
+}
+
+/** Browse the workspace Library and add files/folders to a Files node. */
+function LibraryPicker({ onAdd, onClose }: { onAdd: (p: string) => void; onClose: () => void }) {
+  const [dir, setDir] = useState('library')
+  const [items, setItems] = useState<FsLite[]>([])
+  useEffect(() => {
+    fetch(`/api/fs/list?path=${encodeURIComponent(dir)}`)
+      .then((r) => r.json())
+      .then((d) => setItems(d.items ?? []))
+      .catch(() => setItems([]))
+  }, [dir])
+  const crumbs = dir.split('/').filter(Boolean)
+  return (
+    <div className="mt-1 rounded-md border border-white/10 bg-black/40 p-2">
+      <div className="mb-1 flex items-center gap-1 text-[10px] text-white/45">
+        {crumbs.map((c, i) => (
+          <button key={i} className="hover:text-white/80" onClick={() => setDir(crumbs.slice(0, i + 1).join('/'))}>
+            {i > 0 ? '/ ' : ''}
+            {c}
+          </button>
+        ))}
+        <button
+          className="ml-auto rounded bg-white/10 px-1.5 py-0.5 hover:bg-white/20"
+          title="Add this whole folder"
+          onClick={() => onAdd(dir)}
+        >
+          + this folder
+        </button>
+        <button className="rounded p-0.5 hover:bg-white/10" onClick={onClose} title="Close">
+          <X className="size-3" />
+        </button>
+      </div>
+      <div className="max-h-40 overflow-auto">
+        {items.length === 0 && <p className="px-1 py-2 text-[10px] text-white/30">empty — upload below</p>}
+        {items.map((it) => (
+          <div key={it.rel} className="flex items-center gap-2 rounded px-1.5 py-1 text-[11px] text-white/70 hover:bg-white/5">
+            {it.dir ? <Folder className="size-3.5 shrink-0 text-amber-300/80" /> : <FileIcon className="size-3.5 shrink-0 text-white/40" />}
+            <button className="min-w-0 flex-1 truncate text-left" onClick={() => (it.dir ? setDir(it.rel) : onAdd(it.rel))}>
+              {it.name}
+            </button>
+            <button
+              className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] hover:bg-white/10"
+              onClick={() => onAdd(it.rel)}
+            >
+              add
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** Multi-entry file/folder picker for the Files node: upload or pick from the Library. */
+function FilesField({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const filesRef = useRef<HTMLInputElement>(null)
+  const folderRef = useRef<HTMLInputElement>(null)
+  const [pick, setPick] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  const add = (p: string) => {
+    if (p && !value.includes(p)) onChange([...value, p])
+  }
+  const remove = (p: string) => onChange(value.filter((x) => x !== p))
+
+  const upload = async (files: FileList | null) => {
+    if (!files?.length) return
+    setBusy(true)
+    const added: string[] = []
+    for (const f of Array.from(files)) {
+      const relName = (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name
+      try {
+        const r = await fetch(`/api/fs/upload?path=${encodeURIComponent('library/' + relName)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: f,
+        })
+        const d = await r.json()
+        if (d.path) {
+          const top = relName.includes('/') ? 'library/' + relName.split('/')[0] : d.path
+          if (!added.includes(top)) added.push(top)
+        }
+      } catch {
+        /* skip */
+      }
+    }
+    setBusy(false)
+    const next = [...value]
+    for (const a of added) if (!next.includes(a)) next.push(a)
+    onChange(next)
+    if (filesRef.current) filesRef.current.value = ''
+    if (folderRef.current) folderRef.current.value = ''
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {value.length > 0 && (
+        <div className="space-y-1">
+          {value.map((p) => {
+            const isFolder = !/\.[a-z0-9]+$/i.test(p)
+            return (
+              <div
+                key={p}
+                className="flex items-center gap-2 rounded-md border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-white/75"
+              >
+                {isFolder ? (
+                  <Folder className="size-3.5 shrink-0 text-amber-300/80" />
+                ) : (
+                  <FileIcon className="size-3.5 shrink-0 text-white/40" />
+                )}
+                <span className="min-w-0 flex-1 truncate font-mono">{p.replace(/^library\//, '')}</span>
+                <button
+                  className="rounded p-0.5 text-white/30 hover:bg-red-500/20 hover:text-red-300"
+                  onClick={() => remove(p)}
+                  title="Remove"
+                >
+                  <X className="size-3" />
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+      <div className="flex flex-wrap gap-1">
+        <button
+          className="flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/70 hover:bg-white/10 disabled:opacity-50"
+          onClick={() => filesRef.current?.click()}
+          disabled={busy}
+        >
+          <Upload className="size-3" /> {busy ? '…' : 'Upload files'}
+        </button>
+        <button
+          className="flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/70 hover:bg-white/10 disabled:opacity-50"
+          onClick={() => folderRef.current?.click()}
+          disabled={busy}
+        >
+          <FolderPlus className="size-3" /> Upload folder
+        </button>
+        <button
+          className="flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/70 hover:bg-white/10"
+          onClick={() => setPick((p) => !p)}
+        >
+          <Plus className="size-3" /> Library
+        </button>
+      </div>
+      {pick && <LibraryPicker onAdd={add} onClose={() => setPick(false)} />}
+      <input ref={filesRef} type="file" multiple className="hidden" onChange={(e) => upload(e.target.files)} />
+      <input
+        ref={folderRef}
+        type="file"
+        className="hidden"
+        onChange={(e) => upload(e.target.files)}
+        {...({ webkitdirectory: '', directory: '' } as Record<string, string>)}
+      />
+    </div>
+  )
+}
+
+/** Gallery of a Warehouse node's accumulated runs (newest first), each expandable to its files. */
+function WarehouseGallery({ nodeId }: { nodeId: string }) {
+  const base = `warehouse/${nodeId}`
+  const [runs, setRuns] = useState<FsLite[]>([])
+  const [openRun, setOpenRun] = useState<string | null>(null)
+  const [files, setFiles] = useState<FsLite[]>([])
+  const reload = () =>
+    fetch(`/api/fs/list?path=${encodeURIComponent(base)}`)
+      .then((r) => r.json())
+      .then((d) => setRuns(((d.items ?? []) as FsLite[]).filter((i) => i.dir).sort((a, b) => b.name.localeCompare(a.name))))
+      .catch(() => setRuns([]))
+  useEffect(() => {
+    reload()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodeId])
+  useEffect(() => {
+    if (!openRun) {
+      setFiles([])
+      return
+    }
+    fetch(`/api/fs/list?path=${encodeURIComponent(openRun)}`)
+      .then((r) => r.json())
+      .then((d) => setFiles(((d.items ?? []) as FsLite[]).filter((i) => !i.dir)))
+      .catch(() => setFiles([]))
+  }, [openRun])
+  const raw = (rel: string) => `/api/fs/raw?path=${encodeURIComponent(rel)}`
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-2 text-[10px] text-white/45">
+        <span>
+          {runs.length} run{runs.length === 1 ? '' : 's'} piled
+        </span>
+        <button onClick={reload} className="ml-auto rounded p-0.5 hover:bg-white/10" title="Refresh">
+          <RefreshCw className="size-3" />
+        </button>
+      </div>
+      {runs.length === 0 && (
+        <p className="text-[10px] text-white/30">No results yet — run the graph; each run adds a folder here.</p>
+      )}
+      <div className="space-y-1">
+        {runs.map((r) => (
+          <div key={r.rel} className="rounded-md border border-white/10 bg-black/30">
+            <button
+              className="flex w-full items-center gap-2 px-2 py-1 text-left text-[11px] text-white/75 hover:bg-white/5"
+              onClick={() => setOpenRun(openRun === r.rel ? null : r.rel)}
+            >
+              <Archive className="size-3.5 shrink-0 text-sky-400" />
+              <span className="min-w-0 flex-1 truncate">{r.name.replace(/^run-/, '#')}</span>
+              <ChevronRight className={'size-3 shrink-0 transition ' + (openRun === r.rel ? 'rotate-90' : '')} />
+            </button>
+            {openRun === r.rel && (
+              <div className="border-t border-white/10 p-1">
+                {files.length === 0 && <p className="px-1 py-1 text-[10px] text-white/30">empty</p>}
+                {files.map((f) => (
+                  <a
+                    key={f.rel}
+                    href={raw(f.rel)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block truncate rounded px-1.5 py-0.5 text-[10px] text-sky-300/80 hover:bg-white/5 hover:underline"
+                  >
+                    {f.name}
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+export function Inspector({ onClose }: { onClose?: () => void }) {
   const selectedId = useGraphStore((s) => s.selectedNodeId)
   const node = useGraphStore((s) => s.nodes.find((n) => n.id === s.selectedNodeId) ?? null)
   const run = useGraphStore((s) => (s.selectedNodeId ? s.runState[s.selectedNodeId] : undefined))
@@ -286,6 +575,13 @@ export function Inspector() {
   const updateEdgeData = useGraphStore((s) => s.updateEdgeData)
   const setSelectedEdge = useGraphStore((s) => s.setSelectedEdge)
   const onEdgesChange = useGraphStore((s) => s.onEdgesChange)
+  const [avail, setAvail] = useState<Record<string, boolean>>({})
+  useEffect(() => {
+    fetch('/api/health')
+      .then((r) => r.json())
+      .then((d) => setAvail(d.providers ?? {}))
+      .catch(() => {})
+  }, [])
 
   if (!node || !selectedId) {
     if (edge && selectedEdgeId) {
@@ -293,6 +589,7 @@ export function Inspector() {
         <EdgeInspector
           edge={edge}
           updateEdgeData={updateEdgeData}
+          onClose={onClose}
           onDelete={() => {
             onEdgesChange([{ id: edge.id, type: 'remove' }])
             setSelectedEdge(null)
@@ -301,7 +598,16 @@ export function Inspector() {
       )
     }
     return (
-      <div className="grid h-full w-80 shrink-0 place-items-center border-l border-white/10 bg-[#0d1320] p-4 text-center text-xs text-white/30">
+      <div className="relative flex h-full w-80 shrink-0 items-center justify-center border-l border-white/10 bg-[#0d1320] p-4 text-center text-xs text-white/30">
+        {onClose && (
+          <button
+            onClick={onClose}
+            title="Close panel"
+            className="absolute right-2 top-2 rounded p-1 text-white/40 hover:bg-white/10 hover:text-white/80"
+          >
+            <PanelRightClose className="size-4" />
+          </button>
+        )}
         Select a node — or the loop arrow — to edit its config.
       </div>
     )
@@ -310,6 +616,7 @@ export function Inspector() {
   const spec = getSpec(node.data.kind)
   const cfg = node.data.config
   const Icon = resolveNodeIcon(cfg.symbol, spec.icon)
+  const accent = typeof cfg.color === 'string' && cfg.color ? cfg.color : spec.color
   const variables = spec.inputs.map((p) => p.id)
 
   const groups = new Map<string, FieldDescriptor[]>()
@@ -371,16 +678,23 @@ export function Inspector() {
             onChange={set}
           />
         )
-      case 'select':
+      case 'select': {
+        // The provider list shows only providers that are actually available
+        // (CLI detected / API key set), plus whatever this node already uses.
+        const opts =
+          f.key === 'provider' && Object.keys(avail).length
+            ? (f.options ?? []).filter((o) => avail[o.value] || o.value === String(value ?? ''))
+            : (f.options ?? [])
         return (
           <select className={inputCls} value={String(value ?? '')} onChange={(e) => set(e.target.value)}>
-            {(f.options ?? []).map((o) => (
+            {opts.map((o) => (
               <option key={o.value} value={o.value} className="bg-[#121826]">
                 {o.label}
               </option>
             ))}
           </select>
         )
+      }
       case 'multiselect':
         return (
           <MultiSelectField
@@ -391,6 +705,12 @@ export function Inspector() {
         )
       case 'icon':
         return <IconField value={String(value ?? 'Sparkles')} onChange={set} />
+      case 'color':
+        return <ColorField value={String(value ?? '#22d3ee')} onChange={set} />
+      case 'files':
+        return <FilesField value={Array.isArray(value) ? (value as string[]) : []} onChange={set} />
+      case 'warehouse':
+        return <WarehouseGallery nodeId={selectedId} />
       case 'path':
         return f.pickFile ? (
           <FilePathField value={String(value ?? '')} onChange={set} placeholder={f.placeholder} />
@@ -417,7 +737,7 @@ export function Inspector() {
   return (
     <div className="flex h-full w-80 shrink-0 flex-col border-l border-white/10 bg-[#0d1320]">
       <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2">
-        <Icon className="size-4" style={{ color: spec.color }} />
+        <Icon className="size-4" style={{ color: accent }} />
         <input
           className="flex-1 bg-transparent text-sm font-medium text-white/90 outline-none"
           value={node.data.label}
@@ -441,6 +761,23 @@ export function Inspector() {
               <Play className="size-4" />
             </button>
           ))}
+        {node.data.kind === 'custom' && (
+          <button
+            onClick={() => {
+              const name = window.prompt('Save this agent to the Palette as:', node.data.label)?.trim()
+              if (!name) return
+              usePresets.getState().add({
+                name,
+                symbol: typeof cfg.symbol === 'string' ? cfg.symbol : undefined,
+                config: { ...node.data.config },
+              })
+            }}
+            title="Save this agent to the Palette (reusable across graphs)"
+            className="rounded p-1 text-sky-300 hover:bg-sky-500/20"
+          >
+            <BookmarkPlus className="size-4" />
+          </button>
+        )}
         <button
           onClick={() => deleteNode(selectedId)}
           title="Delete node"
@@ -448,6 +785,11 @@ export function Inspector() {
         >
           <Trash2 className="size-4" />
         </button>
+        {onClose && (
+          <button onClick={onClose} title="Close panel" className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white/80">
+            <PanelRightClose className="size-4" />
+          </button>
+        )}
       </div>
 
       <div className="flex-1 space-y-4 overflow-auto p-3">

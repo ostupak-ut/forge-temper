@@ -140,7 +140,13 @@ export function FlowCanvas() {
       maxZoom={2}
     >
       <Background variant={BackgroundVariant.Dots} gap={18} size={1} color="#1e293b" />
-      <MiniMap pannable zoomable className="!bg-[#0b0f17]" nodeColor={(n) => getSpec((n.data as FtNode['data']).kind).color} />
+      <MiniMap
+        pannable
+        zoomable
+        className="!bg-[#0b0f17]"
+        style={{ width: 132, height: 92 }}
+        nodeColor={(n) => getSpec((n.data as FtNode['data']).kind).color}
+      />
       <Controls className="!bg-[#121826] !text-white" />
     </ReactFlow>
   )

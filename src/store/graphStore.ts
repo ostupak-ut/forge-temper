@@ -48,6 +48,7 @@ export interface GraphState {
   onConnect: (conn: Connection) => void
 
   addNode: (kind: NodeKind, position: XYPosition, parentId?: string) => string
+  addPresetNode: (kind: NodeKind, position: XYPosition, label: string, config: Record<string, unknown>) => string
   updateNodeConfig: (id: string, key: string, value: unknown) => void
   updateNodeLabel: (id: string, label: string) => void
   updateEdgeData: (id: string, patch: Record<string, unknown>) => void
@@ -103,6 +104,19 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     }
     // Container nodes must precede their children in the array.
     set({ nodes: spec.isContainer ? [node, ...get().nodes] : [...get().nodes, node], selectedNodeId: id })
+    return id
+  },
+
+  addPresetNode: (kind, position, label, config) => {
+    const spec = getSpec(kind)
+    const id = makeId(kind)
+    const node: FtNode = {
+      id,
+      type: spec.reactFlowType,
+      position,
+      data: { kind, label: label || spec.label, config: { ...spec.defaultConfig, ...config } },
+    }
+    set({ nodes: [...get().nodes, node], selectedNodeId: id })
     return id
   },
 

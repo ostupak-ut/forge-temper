@@ -8,6 +8,7 @@ import {
   FileStack,
   Lightbulb,
   Sparkles,
+  Archive,
 } from 'lucide-react'
 import type { FieldDescriptor, NodeKind, NodeSpec } from './types'
 
@@ -153,24 +154,23 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
 
   file: {
     kind: 'file',
-    label: 'File',
-    description: 'A file or folder staged into the run’s inputs/.',
+    label: 'Files',
+    description:
+      'Files & folders staged into an agent’s inputs/. Add from the Library, or upload files / a whole folder (e.g. 10 papers). Folders copy in recursively.',
     color: '#94a3b8',
     icon: FileInput,
     inputs: [],
-    outputs: [{ id: 'file', type: 'file', label: 'file' }],
+    outputs: [{ id: 'file', type: 'file', label: 'files' }],
     fields: [
-      { key: 'path', label: 'File', kind: 'path', group: 'File', pickFile: true, help: 'Choose a file to feed into Forge’s inputs/.' },
       {
-        key: 'stageAs',
-        label: 'Stage as (optional)',
-        kind: 'text',
-        group: 'File',
-        placeholder: 'inputs/<name>',
-        help: 'Filename inside the run’s inputs/ (defaults to the chosen file’s name).',
+        key: 'paths',
+        label: 'Files & folders',
+        kind: 'files',
+        group: 'Files',
+        help: 'Each entry is staged into the agent’s inputs/ (folders recursively).',
       },
     ],
-    defaultConfig: { path: '', stageAs: '' },
+    defaultConfig: { paths: [] },
     reactFlowType: 'ftNode',
   },
 
@@ -248,6 +248,7 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
         group: 'Agent',
         help: 'Pick an icon for this agent — it shows on the node and in this panel.',
       },
+      { key: 'color', label: 'Color', kind: 'color', group: 'Agent', help: 'Accent color for this agent node.' },
       ...agentFields({
         promptHelp:
           'Your instructions. {{in}} = upstream output, {{files}} = staged files, {{temper_report}}/{{feedback}} on loop re-runs.',
@@ -271,6 +272,7 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
     defaultConfig: {
       ...agentDefaults(''),
       symbol: 'Sparkles',
+      color: '#22d3ee',
       prompt: '',
       toolScope: ['Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep'],
     },
@@ -333,7 +335,55 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
     defaultConfig: { outputPath: 'main.tex', runLatexmk: true },
     reactFlowType: 'ftNode',
   },
+
+  warehouse: {
+    kind: 'warehouse',
+    label: 'Warehouse',
+    description:
+      'Collects the graph’s results into an indexed pile that ACCUMULATES across runs. Wire it from ANY agent’s output; each run adds a new run-NNN folder.',
+    color: '#0ea5e9',
+    icon: Archive,
+    inputs: [{ id: 'in', type: 'any', label: 'in' }],
+    outputs: [],
+    fields: [
+      {
+        key: 'collect',
+        label: 'Collect',
+        kind: 'select',
+        group: 'Warehouse',
+        options: [
+          { label: 'PDF only', value: 'pdf' },
+          { label: 'Markdown only', value: 'md' },
+          { label: 'LaTeX (.tex)', value: 'tex' },
+          { label: 'Everything', value: 'all' },
+        ],
+        help: 'Which artifact types to pile from the upstream agent each run.',
+      },
+      { key: 'pile', label: 'Pile', kind: 'warehouse', group: 'Warehouse' },
+    ],
+    defaultConfig: { collect: 'pdf' },
+    reactFlowType: 'ftNode',
+  },
 }
 
 export const ALL_KINDS = Object.keys(NODE_SPECS) as NodeKind[]
-export const getSpec = (kind: NodeKind): NodeSpec => NODE_SPECS[kind]
+
+/**
+ * Fallback for unknown/legacy node kinds (e.g. a graph saved before a kind was
+ * removed, or stale in-memory state after an HMR). Renders as a harmless,
+ * portless "Unknown" node instead of crashing the whole canvas.
+ */
+const FALLBACK_SPEC: NodeSpec = {
+  kind: 'idea',
+  label: 'Unknown node',
+  description: 'Unrecognized node type (from an older graph). Safe to delete.',
+  color: '#64748b',
+  icon: FileStack,
+  inputs: [],
+  outputs: [],
+  fields: [],
+  defaultConfig: {},
+  reactFlowType: 'ftNode',
+}
+
+export const getSpec = (kind: NodeKind): NodeSpec => NODE_SPECS[kind] ?? FALLBACK_SPEC

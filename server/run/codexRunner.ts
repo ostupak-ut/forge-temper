@@ -1,4 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
+import { existsSync, readdirSync } from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { emitEvent } from './runEvents'
 import { runStore } from '../persistence/runStore'
 import type { ProviderRunParams, ProviderRunResult } from '../providers/types'
@@ -22,7 +25,39 @@ import type { ProviderRunParams, ProviderRunResult } from '../providers/types'
  * A legacy `{"id":…,"msg":{"type":…}}` envelope is also tolerated.
  */
 
-const CODEX_BIN = process.env.CODEX_BIN || 'codex'
+/**
+ * Resolve the codex binary: explicit CODEX_BIN → the one bundled inside the
+ * OpenAI ChatGPT/Codex IDE extension (VSCode/Cursor) → bare `codex` on PATH.
+ * The extension ships a private binary under openai.chatgpt-<ver>/bin/<platform>/
+ * that never lands on PATH, so a plain `which codex` misses it.
+ */
+export function resolveCodexBin(): string {
+  if (process.env.CODEX_BIN) return process.env.CODEX_BIN
+  const roots = ['.vscode/extensions', '.vscode-insiders/extensions', '.vscode-server/extensions', '.cursor/extensions']
+  for (const rootRel of roots) {
+    const root = path.join(os.homedir(), rootRel)
+    let exts: string[] = []
+    try {
+      exts = readdirSync(root).filter((d) => d.startsWith('openai.chatgpt')).sort().reverse()
+    } catch {
+      continue
+    }
+    for (const ext of exts) {
+      const binDir = path.join(root, ext, 'bin')
+      let plats: string[] = []
+      try {
+        plats = readdirSync(binDir)
+      } catch {
+        continue
+      }
+      for (const plat of plats) {
+        const cand = path.join(binDir, plat, 'codex')
+        if (existsSync(cand)) return cand
+      }
+    }
+  }
+  return 'codex'
+}
 
 function shortCmd(cmd: unknown): string {
   const s = Array.isArray(cmd) ? cmd.join(' ') : String(cmd ?? '')
@@ -41,10 +76,15 @@ export async function runCodexNode(p: ProviderRunParams): Promise<ProviderRunRes
 
   return await new Promise<ProviderRunResult>((resolve) => {
     let child: ChildProcessWithoutNullStreams
+    const bin = resolveCodexBin()
     try {
-      child = spawn(CODEX_BIN, args, { cwd: p.cwd ?? process.cwd(), env: process.env })
+      child = spawn(bin, args, { cwd: p.cwd ?? process.cwd(), env: process.env })
     } catch (e) {
-      return resolve(fail(`Codex CLI unavailable (${String((e as Error)?.message ?? e)}). Install: npm i -g @openai/codex && codex login.`))
+      return resolve(
+        fail(
+          `Codex unavailable (${String((e as Error)?.message ?? e)}). Install the standalone CLI (npm i -g @openai/codex && codex login) or set CODEX_BIN.`,
+        ),
+      )
     }
 
     let lastText = ''
