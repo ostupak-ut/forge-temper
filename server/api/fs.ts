@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { createReadStream } from 'node:fs'
 import { mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import os from 'node:os'
 import path from 'node:path'
 import { getWorkspaceDir } from '../config'
 
@@ -99,6 +100,25 @@ export async function fsRoutes(app: FastifyInstance) {
     await mkdir(path.dirname(dest), { recursive: true })
     await writeFile(dest, body)
     return { path: rel, size: body.length }
+  })
+
+  // Browse directories ANYWHERE on the machine (for choosing the project root).
+  // Lists subfolders only; defaults to the home dir. Not workspace-confined — it
+  // exists to pick the workspace root. Local single-user app.
+  app.get('/api/fs/browse', async (req, reply) => {
+    const raw = String((req.query as { path?: string }).path ?? '')
+    const dir = raw && path.isAbsolute(raw) ? raw : os.homedir()
+    try {
+      const entries = await readdir(dir, { withFileTypes: true })
+      const dirs = entries
+        .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
+        .map((e) => ({ name: e.name, path: path.join(dir, e.name) }))
+        .sort((a, b) => a.name.localeCompare(b.name))
+      const parent = path.dirname(dir)
+      return { path: dir, parent: parent !== dir ? parent : null, home: os.homedir(), dirs }
+    } catch (e) {
+      return reply.code(400).send({ error: String((e as Error)?.message ?? e) })
+    }
   })
 
   // Delete a file or folder (recursive), confined to the workspace.
