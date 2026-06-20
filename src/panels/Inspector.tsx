@@ -763,10 +763,10 @@ export function Inspector({ onClose }: { onClose?: () => void }) {
 
   return (
     <div className="flex h-full w-80 shrink-0 flex-col border-l border-border/10 bg-surface">
-      <div className="flex items-center gap-2 border-b border-border/10 px-3 py-2">
-        <Icon className="size-4" style={{ color: accent }} />
+      <div className="flex items-center gap-1.5 border-b border-border/10 px-3 py-2">
+        <Icon className="size-4 shrink-0" style={{ color: accent }} />
         <input
-          className="flex-1 bg-transparent text-sm font-medium text-fg/90 outline-none"
+          className="min-w-0 flex-1 bg-transparent text-sm font-medium text-fg/90 outline-none"
           value={node.data.label}
           onChange={(e) => updateNodeLabel(selectedId, e.target.value)}
         />
