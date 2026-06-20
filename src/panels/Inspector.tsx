@@ -155,11 +155,17 @@ function ModelField({
     opts = [{ value: 'inherit', label: 'Inherit (default)' }, ...merged.map((m) => ({ value: m.id, label: m.name }))]
   }
   const cur = String(value ?? 'inherit') || 'inherit'
-  // Keep a previously-set model selectable even if it isn't in the current list.
-  if (cur !== 'inherit' && !opts.some((o) => o.value === cur)) opts = [...opts, { value: cur, label: `${cur} (custom)` }]
+  // Only OpenRouter takes arbitrary model ids — keep an off-list value selectable
+  // there. For Claude/Codex/harness a foreign model (e.g. a Grok id left over from
+  // OpenRouter) is invalid, so the list falls back to "inherit".
+  const freeform = provider === 'openrouter' || provider === 'openrouter-agent'
+  if (cur !== 'inherit' && freeform && !opts.some((o) => o.value === cur)) {
+    opts = [...opts, { value: cur, label: `${cur} (custom)` }]
+  }
+  const shown = opts.some((o) => o.value === cur) ? cur : 'inherit'
 
   return (
-    <select className={inputCls} value={cur} onChange={(e) => onChange(e.target.value)}>
+    <select className={inputCls} value={shown} onChange={(e) => onChange(e.target.value)}>
       {opts.map((o) => (
         <option key={o.value} value={o.value} className="bg-card">
           {o.label}
@@ -750,7 +756,16 @@ export function Inspector({ onClose }: { onClose?: () => void }) {
             ? (f.options ?? []).filter((o) => avail[o.value] || o.value === String(value ?? ''))
             : (f.options ?? [])
         return (
-          <select className={inputCls} value={String(value ?? '')} onChange={(e) => set(e.target.value)}>
+          <select
+            className={inputCls}
+            value={String(value ?? '')}
+            onChange={(e) => {
+              set(e.target.value)
+              // Switching provider invalidates the model (e.g. an OpenRouter model
+              // under Claude Code) — reset it to the provider's default.
+              if (f.key === 'provider') updateNodeConfig(selectedId, 'model', 'inherit')
+            }}
+          >
             {opts.map((o) => (
               <option key={o.value} value={o.value} className="bg-card">
                 {o.label}
