@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { CirclePlay, Download, FilePlus2, FolderOpen, Play, Save, SaveAll, Sparkles, Square, Trash2, Upload } from 'lucide-react'
+import { CirclePlay, Download, FilePlus2, FolderOpen, Play, Save, SaveAll, Sparkles, Square, Trash2, Upload, Wand2 } from 'lucide-react'
+import { DesignChat } from '@/panels/DesignChat'
 import { useGraphStore } from '@/store/graphStore'
 import { buildStarterGraph } from '@/io/sampleGraph'
 import { runGraph, stopCurrentRun } from '@/run/runController'
@@ -142,6 +143,7 @@ export function Toolbar() {
   const [current, setCurrent] = useState<string | null>(() => localStorage.getItem(CURRENT_KEY))
   const [dirtyMsg, setDirtyMsg] = useState<string>('')
   const [menuOpen, setMenuOpen] = useState(false)
+  const [designOpen, setDesignOpen] = useState(false)
 
   const refresh = useCallback(() => listFlows().then(setFlows), [])
   useEffect(() => void refresh(), [refresh])
@@ -246,6 +248,13 @@ export function Toolbar() {
         }}
       >
         <Sparkles className="size-3.5" /> Starter
+      </button>
+      <button
+        className={btn + ' !border-temper/40 !bg-temper/10 text-temper hover:!bg-temper/20'}
+        title="Describe a workflow in plain English — an AI designs the graph for you"
+        onClick={() => setDesignOpen(true)}
+      >
+        <Wand2 className="size-3.5" /> Design with AI
       </button>
 
       <div className="relative">
@@ -355,6 +364,8 @@ export function Toolbar() {
           </button>
         )}
       </div>
+
+      {designOpen && <DesignChat onClose={() => setDesignOpen(false)} workflow={current} />}
     </div>
   )
 }

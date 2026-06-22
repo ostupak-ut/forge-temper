@@ -89,7 +89,7 @@ export interface NodeSpec {
   /** Legacy: a resizable container (the old Loop zone). Retained as dead-but-legal. */
   isContainer?: boolean
   /** Which React Flow node component renders it. */
-  reactFlowType: 'ftNode' | 'ftGroup'
+  reactFlowType: 'ftNode' | 'ftGroup' | 'ftFile' | 'ftWarehouse' | 'ftIdea'
   /**
    * Hide from the node Palette (still in the registry, so saved graphs render and
    * a Custom Agent can take on the same role via its skill picker). Used for the

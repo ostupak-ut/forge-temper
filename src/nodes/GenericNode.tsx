@@ -4,7 +4,7 @@ import { Play, Square, X } from 'lucide-react'
 import type { FtNode } from '@/store/graphStore'
 import { useGraphStore } from '@/store/graphStore'
 import { getSpec } from '@/registry/nodeSpecs'
-import { resolveNodeIcon } from '@/registry/icons'
+import { EditableTitle, IconColorMenu } from '@/components/NodeChrome'
 import { PORT_COLOR, handleId } from '@/registry/portTypes'
 import type { Port } from '@/registry/types'
 import type { NodeRunStatus } from '@shared/contracts'
@@ -76,11 +76,12 @@ function PortRow({ port, dir }: { port: Port; dir: 'in' | 'out' }) {
 
 function GenericNodeImpl({ id, data, selected }: NodeProps<FtNode>) {
   const spec = getSpec(data.kind)
-  const Icon = resolveNodeIcon((data.config as { symbol?: unknown })?.symbol, spec.icon)
   const cfgColor = (data.config as { color?: unknown })?.color
   const accent = typeof cfgColor === 'string' && cfgColor ? cfgColor : spec.color
   const run = useGraphStore((s) => s.runState[id])
   const deleteNode = useGraphStore((s) => s.deleteNode)
+  const updateNodeConfig = useGraphStore((s) => s.updateNodeConfig)
+  const updateNodeLabel = useGraphStore((s) => s.updateNodeLabel)
   const status: NodeRunStatus = run?.status ?? 'idle'
   const runnable = spec.fields.some((f) => f.kind === 'prompt')
   const busy = status === 'running' || status === 'queued'
@@ -100,8 +101,19 @@ function GenericNodeImpl({ id, data, selected }: NodeProps<FtNode>) {
         className="flex items-center gap-2 rounded-t-xl px-3 py-2"
         style={{ background: `${accent}22`, borderBottom: `1px solid ${accent}55` }}
       >
-        <Icon className="size-4 shrink-0" style={{ color: accent }} />
-        <span className="truncate text-sm font-medium text-fg/90">{data.label}</span>
+        <IconColorMenu
+          symbol={(data.config as { symbol?: unknown })?.symbol}
+          color={accent}
+          fallbackIcon={spec.icon}
+          accent={accent}
+          onSymbol={(name) => updateNodeConfig(id, 'symbol', name)}
+          onColor={(hex) => updateNodeConfig(id, 'color', hex)}
+        />
+        <EditableTitle
+          value={data.label}
+          onChange={(v) => updateNodeLabel(id, v)}
+          className="flex-1 text-sm font-medium text-fg/90"
+        />
         <span className={cn('ml-auto size-2 rounded-full', STATUS_DOT[status])} title={status} />
         {runnable &&
           (busy ? (

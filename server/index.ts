@@ -8,6 +8,7 @@ import { fsRoutes } from './api/fs'
 import { flowRoutes } from './api/flows'
 import { runRoutes } from './api/runs'
 import { settingsRoutes } from './api/settings'
+import { designRoutes } from './api/design'
 import { keyPresence } from './persistence/settingsStore'
 import { resolveCodexBin } from './run/codexRunner'
 
@@ -46,6 +47,7 @@ await app.register(fsRoutes)
 await app.register(flowRoutes)
 await app.register(runRoutes)
 await app.register(settingsRoutes)
+await app.register(designRoutes)
 
 app.get('/api/health', async () => {
   const claude = await getClaudeVersion()

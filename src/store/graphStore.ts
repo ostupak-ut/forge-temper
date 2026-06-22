@@ -203,7 +203,16 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   setSelectedEdge: (id) => set({ selectedEdgeId: id, selectedNodeId: null }),
 
   setGraph: (nodes, edges) =>
-    set({ nodes, edges, selectedNodeId: null, selectedEdgeId: null, runState: {}, activeEdgeIds: [] }),
+    set({
+      // Re-derive each node's React Flow `type` from its spec so graphs saved
+      // before a kind changed renderer (e.g. Files: ftNode → ftFile) upgrade.
+      nodes: nodes.map((n) => ({ ...n, type: getSpec(n.data.kind).reactFlowType })),
+      edges,
+      selectedNodeId: null,
+      selectedEdgeId: null,
+      runState: {},
+      activeEdgeIds: [],
+    }),
 
   setRunState: (id, run) =>
     set({ runState: { ...get().runState, [id]: { ...get().runState[id], ...run } as NodeRun } }),

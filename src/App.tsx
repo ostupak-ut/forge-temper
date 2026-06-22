@@ -8,6 +8,8 @@ import { Toolbar } from '@/panels/Toolbar'
 import { FileManager } from '@/panels/FileManager'
 import { Settings } from '@/panels/Settings'
 import { Help } from '@/panels/Help'
+import { DropZone } from '@/components/DropZone'
+import { RootFolder } from '@/components/RootFolder'
 import { useGraphStore } from '@/store/graphStore'
 import { loadAutosave, saveAutosave, serializeGraph } from '@/io/serialize'
 import { getTheme, subscribe, toggleTheme } from '@/theme'
@@ -68,8 +70,15 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
   const [inspectorOpen, setInspectorOpen] = useState(true)
+  const [libraryRefresh, setLibraryRefresh] = useState(0)
   return (
     <ReactFlowProvider>
+      <DropZone
+        onImported={() => {
+          setFilesOpen(true)
+          setLibraryRefresh((n) => n + 1)
+        }}
+      />
       <div className="flex h-full flex-col">
         <header className="flex items-center gap-3 border-b border-border/10 bg-field px-4 py-2">
           <div className="flex items-center gap-1.5 font-semibold tracking-tight">
@@ -77,6 +86,7 @@ export function App() {
             <span>Forge</span>
           </div>
           <span className="text-sm text-fg/40">Visual Flow Modeller</span>
+          <RootFolder />
           <div className="ml-auto flex items-center gap-3 text-xs">
             <HealthBadge />
             <button
@@ -110,7 +120,7 @@ export function App() {
           )}
         </div>
 
-        {filesOpen && <FileManager onClose={() => setFilesOpen(false)} />}
+        {filesOpen && <FileManager onClose={() => setFilesOpen(false)} refreshKey={libraryRefresh} />}
 
         <div className="flex items-center gap-2 border-t border-border/10 bg-field px-3 py-1">
           <button

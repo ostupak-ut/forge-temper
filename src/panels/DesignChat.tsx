@@ -1,0 +1,232 @@
+import { useEffect, useRef, useState } from 'react'
+import { Check, MessageSquarePlus, Send, Sparkles, Wand2, X } from 'lucide-react'
+import { useGraphStore } from '@/store/graphStore'
+import { parseGraph, requestDesign, type ChatMsg, type ParsedGraph } from '@/io/designApi'
+import {
+  clearDesignChat,
+  loadDesignChat,
+  loadDesignPrefs,
+  saveDesignChat,
+  saveDesignPrefs,
+} from '@/io/designHistory'
+
+const PROVIDERS = [
+  { value: 'claude-code', label: 'Claude Code (subscription)' },
+  { value: 'openrouter', label: 'OpenRouter (API key)' },
+]
+
+const MODELS: Record<string, { value: string; label: string }[]> = {
+  'claude-code': [
+    { value: 'inherit', label: 'Default (session)' },
+    { value: 'claude-opus-4-8', label: 'Opus 4.8' },
+    { value: 'claude-sonnet-4-6', label: 'Sonnet 4.6' },
+    { value: 'claude-haiku-4-5', label: 'Haiku 4.5' },
+  ],
+  openrouter: [
+    { value: 'anthropic/claude-sonnet-4.5', label: 'Claude Sonnet 4.5' },
+    { value: 'anthropic/claude-opus-4.8', label: 'Claude Opus 4.8' },
+    { value: 'openai/gpt-4o', label: 'GPT-4o' },
+    { value: 'google/gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+  ],
+}
+
+interface Turn extends ChatMsg {
+  graph?: ParsedGraph | null
+  /** assistant prose with any ```json fence stripped, for display */
+  display?: string
+}
+
+const stripFences = (t: string) => t.replace(/```(?:json)?[\s\S]*?```/g, '').trim()
+
+/** Rebuild displayable turns (Apply buttons, prose) from stored role+content. */
+function hydrate(msgs: ChatMsg[]): Turn[] {
+  return msgs.map((m) =>
+    m.role === 'assistant'
+      ? { ...m, graph: parseGraph(m.content), display: stripFences(m.content) || '(generated a workflow)' }
+      : m,
+  )
+}
+
+const strip = (turns: Turn[]): ChatMsg[] => turns.map((t) => ({ role: t.role, content: t.content }))
+
+export function DesignChat({ onClose, workflow }: { onClose: () => void; workflow: string | null }) {
+  const setGraph = useGraphStore((s) => s.setGraph)
+  const prefs = loadDesignPrefs()
+  const initProvider = prefs.provider && MODELS[prefs.provider] ? prefs.provider : 'claude-code'
+  const [provider, setProvider] = useState(initProvider)
+  const [model, setModel] = useState(prefs.model || MODELS[initProvider][0].value)
+  const [turns, setTurns] = useState<Turn[]>(() => hydrate(loadDesignChat(workflow)))
+  const [input, setInput] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [appliedAt, setAppliedAt] = useState<number | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Reload this workflow's saved conversation when the active flow changes.
+  useEffect(() => {
+    setTurns(hydrate(loadDesignChat(workflow)))
+  }, [workflow])
+
+  useEffect(() => {
+    saveDesignPrefs({ provider, model })
+  }, [provider, model])
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+  }, [turns, busy])
+
+  const onProvider = (p: string) => {
+    setProvider(p)
+    setModel(MODELS[p][0].value)
+  }
+
+  const newChat = () => {
+    if (turns.length && !window.confirm('Start a new chat? This clears the saved conversation for this workflow.')) return
+    setTurns([])
+    clearDesignChat(workflow)
+    setError('')
+  }
+
+  const send = async () => {
+    const text = input.trim()
+    if (!text || busy) return
+    setError('')
+    const withUser: Turn[] = [...turns, { role: 'user', content: text }]
+    setTurns(withUser)
+    saveDesignChat(workflow, strip(withUser))
+    setInput('')
+    setBusy(true)
+    try {
+      const reply = await requestDesign(provider, model, strip(withUser))
+      const graph = parseGraph(reply)
+      const next: Turn[] = [
+        ...withUser,
+        { role: 'assistant', content: reply, graph, display: stripFences(reply) || '(generated a workflow)' },
+      ]
+      setTurns(next)
+      saveDesignChat(workflow, strip(next))
+    } catch (e) {
+      setError(String((e as Error)?.message ?? e))
+    }
+    setBusy(false)
+  }
+
+  const apply = (g: ParsedGraph) => {
+    setGraph(g.nodes, g.edges)
+    setAppliedAt(Date.now())
+    setTimeout(() => setAppliedAt(null), 1800)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="flex h-[80vh] w-[36rem] flex-col rounded-xl border border-border/15 bg-card text-fg shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-center gap-2 border-b border-border/10 px-4 py-3">
+          <Wand2 className="size-4 text-temper" />
+          <h2 className="text-sm font-semibold text-fg/90">Design with AI</h2>
+          <span className="max-w-[8rem] truncate rounded bg-fg/10 px-1.5 py-0.5 text-[10px] text-fg/45">
+            {workflow?.trim() || 'unsaved'}
+          </span>
+          <button
+            onClick={newChat}
+            title="New chat (clears this workflow's conversation)"
+            className="rounded p-1 text-fg/45 hover:bg-fg/10 hover:text-fg/80"
+          >
+            <MessageSquarePlus className="size-4" />
+          </button>
+          <select
+            value={provider}
+            onChange={(e) => onProvider(e.target.value)}
+            className="ml-auto rounded-md border border-border/15 bg-field px-2 py-1 text-[11px] text-fg/80 outline-none"
+          >
+            {PROVIDERS.map((p) => (
+              <option key={p.value} value={p.value} className="bg-card">
+                {p.label}
+              </option>
+            ))}
+          </select>
+          <select
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            className="rounded-md border border-border/15 bg-field px-2 py-1 text-[11px] text-fg/80 outline-none"
+          >
+            {MODELS[provider].map((m) => (
+              <option key={m.value} value={m.value} className="bg-card">
+                {m.label}
+              </option>
+            ))}
+          </select>
+          <button onClick={onClose} className="rounded p-1 text-fg/40 hover:bg-fg/10">
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+          {turns.length === 0 && (
+            <div className="mx-auto mt-8 max-w-sm text-center text-xs text-fg/40">
+              <Sparkles className="mx-auto mb-2 size-6 text-temper/70" />
+              Describe the workflow you want and I'll build the graph. e.g.{' '}
+              <span className="text-fg/60">
+                "a research agent that gathers notes, a writer that drafts from them, and an editor that
+                polishes — chain them and warehouse the result."
+              </span>
+            </div>
+          )}
+          {turns.map((t, i) => (
+            <div key={i} className={t.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
+              <div
+                className={
+                  'max-w-[85%] rounded-lg px-3 py-2 text-xs leading-relaxed ' +
+                  (t.role === 'user' ? 'bg-temper/15 text-fg/90' : 'bg-fg/[0.06] text-fg/80')
+                }
+              >
+                <p className="whitespace-pre-wrap">{t.role === 'assistant' ? t.display : t.content}</p>
+                {t.role === 'assistant' && t.graph && (
+                  <button
+                    onClick={() => apply(t.graph!)}
+                    className="mt-2 flex items-center gap-1.5 rounded-md bg-emerald-500/20 px-2.5 py-1 text-[11px] font-medium text-emerald-300 hover:bg-emerald-500/30"
+                  >
+                    <Check className="size-3.5" />
+                    Apply to canvas · {t.graph.nodeCount} nodes, {t.graph.edgeCount} edges
+                  </button>
+                )}
+                {t.role === 'assistant' && !t.graph && (
+                  <p className="mt-1 text-[10px] text-amber-400/80">No valid graph found in the reply — try rephrasing.</p>
+                )}
+              </div>
+            </div>
+          ))}
+          {busy && <p className="text-xs text-fg/40">Designing…</p>}
+          {error && <p className="text-xs text-rose-400">{error}</p>}
+          {appliedAt && <p className="text-center text-xs text-emerald-300">Applied to canvas ✓</p>}
+        </div>
+
+        <div className="flex shrink-0 items-end gap-2 border-t border-border/10 p-3">
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                void send()
+              }
+            }}
+            rows={2}
+            placeholder="Describe the workflow… (Enter to send, Shift+Enter for newline)"
+            className="min-w-0 flex-1 resize-none rounded-md border border-border/15 bg-field px-2.5 py-2 text-xs text-fg/90 outline-none focus:border-temper"
+          />
+          <button
+            onClick={() => void send()}
+            disabled={busy || !input.trim()}
+            className="flex items-center gap-1.5 rounded-md bg-temper/20 px-3 py-2 text-xs font-medium text-temper hover:bg-temper/30 disabled:opacity-50"
+          >
+            <Send className="size-3.5" />
+            Send
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}

@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify'
+import { spawn } from 'node:child_process'
 import { createReadStream } from 'node:fs'
 import { mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import os from 'node:os'
@@ -131,6 +132,35 @@ export async function fsRoutes(app: FastifyInstance) {
       return { ok: true, path: p }
     } catch (e) {
       return reply.code(400).send({ error: String((e as Error)?.message ?? e) })
+    }
+  })
+
+  // Reveal a workspace path in the OS file manager (Finder / Explorer / xdg).
+  // A directory opens directly; a file is revealed (selected) in its folder.
+  app.post('/api/fs/reveal', async (req, reply) => {
+    const rel = String((req.query as { path?: string }).path ?? '').trim()
+    const target = safeResolve(rel)
+    if (!target || !rel) return reply.code(400).send({ error: 'invalid path' })
+    let isDir = false
+    try {
+      isDir = (await stat(target)).isDirectory()
+    } catch {
+      return reply.code(404).send({ error: 'not found' })
+    }
+    try {
+      const plat = os.platform()
+      if (plat === 'darwin') {
+        spawn('open', isDir ? [target] : ['-R', target], { detached: true, stdio: 'ignore' }).unref()
+      } else if (plat === 'win32') {
+        const args = isDir ? [target] : [`/select,${target}`]
+        spawn('explorer', args, { detached: true, stdio: 'ignore' }).unref()
+      } else {
+        const dir = isDir ? target : path.dirname(target)
+        spawn('xdg-open', [dir], { detached: true, stdio: 'ignore' }).unref()
+      }
+      return { ok: true }
+    } catch (e) {
+      return reply.code(500).send({ error: String((e as Error)?.message ?? e) })
     }
   })
 

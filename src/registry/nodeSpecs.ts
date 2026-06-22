@@ -6,7 +6,7 @@ import {
   PenLine,
   BookText,
   FileStack,
-  Lightbulb,
+  StickyNote,
   Sparkles,
   Archive,
 } from 'lucide-react'
@@ -93,24 +93,24 @@ const agentDefaults = (skill = '') => ({
 export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
   idea: {
     kind: 'idea',
-    label: 'Idea',
-    description: 'Your raw idea or rough draft — the seed Forge turns into a prototype. No file needed.',
+    label: 'Prompt',
+    description: 'A sticky note — type your idea / prompt directly on it. The seed Forge turns into a prototype.',
     color: '#8b5cf6',
-    icon: Lightbulb,
+    icon: StickyNote,
     inputs: [],
-    outputs: [{ id: 'idea', type: 'idea', label: 'idea' }],
+    outputs: [{ id: 'idea', type: 'idea', label: 'prompt' }],
     fields: [
       {
         key: 'text',
-        label: 'Idea',
+        label: 'Prompt',
         kind: 'textarea',
-        group: 'Idea',
+        group: 'Prompt',
         rows: 8,
-        help: 'Describe your model / result / mechanism in plain words. Forge takes it from here.',
+        help: 'Type directly on the node, or here. Describe your model / result / mechanism — Forge takes it from here.',
       },
     ],
     defaultConfig: { text: '' },
-    reactFlowType: 'ftNode',
+    reactFlowType: 'ftIdea',
   },
 
   infocard: {
@@ -156,9 +156,9 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
 
   file: {
     kind: 'file',
-    label: 'Files',
+    label: 'File',
     description:
-      'Files & folders staged into an agent’s inputs/. Add from the Library, or upload files / a whole folder (e.g. 10 papers). Folders copy in recursively.',
+      'Files & folders staged into an agent’s inputs/. Drag files straight from your desktop onto the canvas, drop onto this node to add more, or pick from the Library. Folders copy in recursively.',
     color: '#94a3b8',
     icon: FileInput,
     inputs: [],
@@ -173,7 +173,7 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
       },
     ],
     defaultConfig: { paths: [] },
-    reactFlowType: 'ftNode',
+    reactFlowType: 'ftFile',
   },
 
   forge: {
@@ -341,6 +341,7 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
 
   assemble: {
     kind: 'assemble',
+    hidePalette: true,
     label: 'Assemble',
     description:
       'Stitches the verified theorems + written sections + bibliography into one compilable main.tex and runs latexmk → PDF. An agent node — pick any agentic provider (Claude Code / Codex / OpenRouter-agent).',
@@ -407,7 +408,7 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
       { key: 'pile', label: 'Pile', kind: 'warehouse', group: 'Warehouse' },
     ],
     defaultConfig: { collect: 'all', warehouseName: '' },
-    reactFlowType: 'ftNode',
+    reactFlowType: 'ftWarehouse',
   },
 }
 

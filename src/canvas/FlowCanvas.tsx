@@ -17,6 +17,7 @@ import { nodeTypes } from '@/nodes/nodeTypes'
 import { edgeTypes } from '@/edges/edgeTypes'
 import { getSpec } from '@/registry/nodeSpecs'
 import { usePresets } from '@/io/customPresets'
+import { collectDropFiles, hasOsFiles, topLevelPaths, uploadDropFiles } from '@/io/fileDrop'
 import { arePortsCompatible, handleId, PORT_COLOR } from '@/registry/portTypes'
 import type { NodeKind, Port } from '@/registry/types'
 
@@ -110,6 +111,26 @@ export function FlowCanvas() {
     (e: React.DragEvent) => {
       e.preventDefault()
       const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY })
+
+      // OS files/folders dropped onto the canvas: spawn the Files node IMMEDIATELY
+      // from the dropped paths, then upload bytes in the background. Capture the
+      // drop files synchronously (entry handles expire after the event).
+      if (hasOsFiles(e.dataTransfer)) {
+        const filesP = collectDropFiles(e.dataTransfer)
+        void (async () => {
+          const dropped = await filesP
+          if (!dropped.length) return
+          const paths = topLevelPaths(dropped, 'library')
+          const only = paths[0].split('/').pop() ?? 'Files'
+          const label = paths.length === 1 ? only : `${paths.length} items`
+          const id = addPresetNode('file', pos, label, { paths })
+          setSelected(id)
+          // Upload in the background; the node already references the final paths.
+          void uploadDropFiles(dropped, 'library')
+        })()
+        return
+      }
+
       // A dragged saved agent (preset) carries its id; instantiate it with config.
       const presetId = e.dataTransfer.getData(DRAG_PRESET)
       if (presetId) {
@@ -169,7 +190,7 @@ export function FlowCanvas() {
       onDrop={onDrop}
       onDragOver={(e) => {
         e.preventDefault()
-        e.dataTransfer.dropEffect = 'move'
+        e.dataTransfer.dropEffect = hasOsFiles(e.dataTransfer) ? 'copy' : 'move'
       }}
       defaultEdgeOptions={{ type: 'default' }}
       proOptions={{ hideAttribution: true }}

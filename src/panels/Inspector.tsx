@@ -3,8 +3,6 @@ import {
   Archive,
   BookmarkPlus,
   ChevronRight,
-  File as FileIcon,
-  Folder,
   FolderPlus,
   PanelRightClose,
   Play,
@@ -21,6 +19,7 @@ import type { Edge } from '@xyflow/react'
 import { useGraphStore } from '@/store/graphStore'
 import { getSpec } from '@/registry/nodeSpecs'
 import { AGENT_ICONS, ICON_NAMES, resolveNodeIcon } from '@/registry/icons'
+import { FileGlyphIcon } from '@/registry/fileIcons'
 import type { FieldDescriptor, FieldOption } from '@/registry/types'
 import type { NodeRunStatus } from '@shared/contracts'
 import { runSingleNode, stopCurrentRun } from '@/run/runController'
@@ -425,7 +424,7 @@ function LibraryPicker({ onAdd, onClose }: { onAdd: (p: string) => void; onClose
         {items.length === 0 && <p className="px-1 py-2 text-[10px] text-fg/30">empty — upload below</p>}
         {items.map((it) => (
           <div key={it.rel} className="flex items-center gap-2 rounded px-1.5 py-1 text-[11px] text-fg/70 hover:bg-fg/5">
-            {it.dir ? <Folder className="size-3.5 shrink-0 text-amber-300/80" /> : <FileIcon className="size-3.5 shrink-0 text-fg/40" />}
+            <FileGlyphIcon name={it.name} dir={it.dir} className="size-3.5 shrink-0" />
             <button className="min-w-0 flex-1 truncate text-left" onClick={() => (it.dir ? setDir(it.rel) : onAdd(it.rel))}>
               {it.name}
             </button>
@@ -494,11 +493,7 @@ function FilesField({ value, onChange }: { value: string[]; onChange: (v: string
                 key={p}
                 className="flex items-center gap-2 rounded-md border border-border/10 bg-field px-2 py-1 text-[11px] text-fg/75"
               >
-                {isFolder ? (
-                  <Folder className="size-3.5 shrink-0 text-amber-300/80" />
-                ) : (
-                  <FileIcon className="size-3.5 shrink-0 text-fg/40" />
-                )}
+                <FileGlyphIcon name={p} dir={isFolder} className="size-3.5 shrink-0" />
                 <span className="min-w-0 flex-1 truncate font-mono">{p.replace(/^library\//, '')}</span>
                 <button
                   className="rounded p-0.5 text-fg/30 hover:bg-red-500/20 hover:text-red-300"

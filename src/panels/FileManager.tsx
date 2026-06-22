@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ChevronRight, File as FileIcon, Folder, FolderPlus, RefreshCw, Trash2, Upload, X } from 'lucide-react'
+import { ChevronRight, ExternalLink, FolderPlus, RefreshCw, Trash2, Upload, X } from 'lucide-react'
+import { FileGlyphIcon } from '@/registry/fileIcons'
+import { collectDropFiles, hasOsFiles, uploadDropFiles } from '@/io/fileDrop'
+import { revealInOS } from '@/io/reveal'
 
 interface FsEntry {
   name: string
@@ -15,11 +18,12 @@ function extOf(name: string): string {
   return i >= 0 ? name.slice(i).toLowerCase() : ''
 }
 
-export function FileManager({ onClose }: { onClose: () => void }) {
+export function FileManager({ onClose, refreshKey }: { onClose: () => void; refreshKey?: number }) {
   const [path, setPath] = useState('library')
   const [items, setItems] = useState<FsEntry[]>([])
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
   const [preview, setPreview] = useState<{ rel: string; ext: string } | null>(null)
   const [text, setText] = useState<string>('')
   const filesRef = useRef<HTMLInputElement>(null)
@@ -38,7 +42,24 @@ export function FileManager({ onClose }: { onClose: () => void }) {
       .catch((e) => setError(String(e)))
   }, [])
 
-  useEffect(() => load(path), [path, load])
+  // Reload on folder change and whenever the parent bumps refreshKey (e.g. after
+  // an app-wide drop imported files while the Library was open).
+  useEffect(() => load(path), [path, load, refreshKey])
+
+  // Drop OS files/folders into the CURRENTLY-OPEN folder.
+  const onDropFiles = async (e: React.DragEvent) => {
+    setDragOver(false)
+    if (!hasOsFiles(e.dataTransfer)) return
+    e.preventDefault()
+    e.stopPropagation()
+    const target = path || 'library'
+    const dropped = await collectDropFiles(e.dataTransfer)
+    if (!dropped.length) return
+    setBusy(true)
+    await uploadDropFiles(dropped, target)
+    setBusy(false)
+    load(path)
+  }
 
   useEffect(() => {
     if (preview && TEXT_EXT.includes(preview.ext)) {
@@ -87,7 +108,29 @@ export function FileManager({ onClose }: { onClose: () => void }) {
   const crumbs = path ? path.split('/') : []
 
   return (
-    <div className="flex h-64 shrink-0 flex-col border-t border-border/10 bg-surface">
+    <div
+      className={
+        'relative flex h-64 shrink-0 flex-col border-t border-border/10 bg-surface ' +
+        (dragOver ? 'ring-2 ring-inset ring-temper' : '')
+      }
+      onDrop={onDropFiles}
+      onDragOver={(e) => {
+        if (!hasOsFiles(e.dataTransfer)) return
+        e.preventDefault()
+        e.stopPropagation()
+        e.dataTransfer.dropEffect = 'copy'
+        setDragOver(true)
+      }}
+      onDragLeave={(e) => {
+        // Only clear when leaving the panel entirely, not when crossing children.
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver(false)
+      }}
+    >
+      {dragOver && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-bg/60 text-xs font-medium text-temper">
+          Drop into {path || 'library'}/
+        </div>
+      )}
       <div className="flex items-center gap-2 border-b border-border/10 px-3 py-1.5 text-xs">
         <span className="font-semibold text-fg/60">Library</span>
         <button onClick={() => setPath('')} className="text-fg/40 hover:text-fg/80">
@@ -115,6 +158,13 @@ export function FileManager({ onClose }: { onClose: () => void }) {
         >
           <FolderPlus className="size-3" /> Folder
         </button>
+        <button
+          onClick={() => void revealInOS(path || 'library')}
+          className="rounded p-1 hover:bg-fg/10"
+          title="Open this folder in Finder / Explorer"
+        >
+          <ExternalLink className="size-3.5 text-fg/40" />
+        </button>
         <button onClick={() => load(path)} className="rounded p-1 hover:bg-fg/10" title="Refresh">
           <RefreshCw className="size-3.5 text-fg/40" />
         </button>
@@ -127,7 +177,7 @@ export function FileManager({ onClose }: { onClose: () => void }) {
         <div className="w-1/3 overflow-auto border-r border-border/10 p-1">
           {error && <p className="p-2 text-[11px] text-red-400">{error}</p>}
           {!error && items.length === 0 && (
-            <p className="p-2 text-[11px] text-fg/30">empty — Upload files or a Folder above.</p>
+            <p className="p-2 text-[11px] text-fg/30">empty — drop files here, or use Upload / Folder above.</p>
           )}
           {items.map((it) => (
             <div
@@ -138,11 +188,7 @@ export function FileManager({ onClose }: { onClose: () => void }) {
                 onClick={() => (it.dir ? setPath(it.rel) : setPreview({ rel: it.rel, ext: extOf(it.name) }))}
                 className="flex min-w-0 flex-1 items-center gap-2 text-left"
               >
-                {it.dir ? (
-                  <Folder className="size-3.5 shrink-0 text-amber-300/80" />
-                ) : (
-                  <FileIcon className="size-3.5 shrink-0 text-fg/40" />
-                )}
+                <FileGlyphIcon name={it.name} dir={it.dir} className="size-3.5 shrink-0" />
                 <span className="truncate">{it.name}</span>
                 {!it.dir && <span className="ml-auto text-fg/25">{(it.size / 1024).toFixed(0)}k</span>}
               </button>
