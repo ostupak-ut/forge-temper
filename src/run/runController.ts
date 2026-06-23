@@ -123,7 +123,7 @@ function subscribe(runId: string): void {
  * engine compiles the flat cyclic graph, runs nodes sequentially, and iterates
  * the Forge↔Temper cycle through the loop driver.
  */
-export async function runGraph(): Promise<void> {
+export async function runGraph(parallel = false): Promise<void> {
   const st = useGraphStore.getState()
   st.resetRun()
   const { nodes, edges } = st
@@ -133,7 +133,7 @@ export async function runGraph(): Promise<void> {
     const res = await fetch('/api/runs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: 'graph', graph: { nodes, edges } }),
+      body: JSON.stringify({ mode: 'graph', parallel, graph: { nodes, edges } }),
     })
     const json = await res.json()
     runId = json.runId

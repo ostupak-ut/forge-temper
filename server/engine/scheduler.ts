@@ -1,14 +1,23 @@
 import { emitEvent } from '../run/runEvents'
-import { runOneNode } from './runOneNode'
+import { runOneNode, effectiveWorkingDir } from './runOneNode'
 import { runLoop } from './loopDriver'
 import type { CompiledGraph, Super } from './compile'
 import type { GraphEdge, GraphNode } from './runOneNode'
 
+export interface ScheduleOpts {
+  /** Run independent same-stage nodes concurrently (capped + working-dir guarded). */
+  parallel?: boolean
+  /** Max agents in flight at once when parallel (default 3). */
+  concurrency?: number
+}
+
 /**
- * Run a compiled graph SEQUENTIALLY (one agent/harness at a time). Kahn
- * topo-sort over the condensation (loops collapsed to super-nodes); plain
- * super-nodes run via runOneNode, loop super-nodes via runLoop. The AbortSignal
- * is respected before every super-node.
+ * Run a compiled graph. Kahn topo-sort over the condensation (loops collapsed to
+ * super-nodes); plain super-nodes run via runOneNode, loop super-nodes via
+ * runLoop. By default nodes run SEQUENTIALLY (one at a time). With opts.parallel
+ * the ready set (independent same-stage nodes) runs concurrently behind a
+ * concurrency cap and a per-working-dir mutex, so two nodes sharing a
+ * papers/<id> never write it at once. The AbortSignal is respected throughout.
  */
 export async function schedule(
   compiled: CompiledGraph,
@@ -16,6 +25,7 @@ export async function schedule(
   edges: GraphEdge[],
   runId: string,
   signal: AbortSignal,
+  opts: ScheduleOpts = {},
 ): Promise<void> {
   for (const err of compiled.errors) {
     emitEvent(runId, { type: 'error', nodeId: '', error: err })
@@ -40,38 +50,88 @@ export async function schedule(
   // (via valueForSource) to downstream agents. loopcontrol is config-only too.
   const NON_EXEC = new Set(['idea', 'file', 'infocard', 'loopcontrol'])
 
-  while (ready.length) {
-    if (signal.aborted) break
-    const id = ready.shift()!
-    if (done.has(id)) continue
-    done.add(id)
-
-    const sup = superById.get(id)
-    if (!sup) continue
-
+  // Execute one super-node, recording its output for downstream nodes.
+  const runSuper = async (sup: Super): Promise<void> => {
     if (sup.kind === 'loop') {
       const report = await runLoop(sup.plan, nodes, edges, runId, signal, undefined, Object.fromEntries(results))
       // Expose the loop's output under its verdict source (e.g. Temper) so
       // downstream nodes wired from it pick it up.
       if (report) results.set(sup.plan.verdictSourceId, report)
-    } else {
-      const node = nodes.find((n) => n.id === sup.id)
-      if (node && !NON_EXEC.has(node.data.kind)) {
-        if (signal.aborted) break
-        // The provider emits its own status/token/result events; we only need
-        // to surface a thrown error (e.g. the needsAgent gate).
-        try {
-          const res = await runOneNode(node, nodes, edges, runId, signal, { results: Object.fromEntries(results) })
-          if (res.result) results.set(node.id, res.result)
-        } catch (e) {
-          emitEvent(runId, { type: 'error', nodeId: node.id, error: String((e as Error)?.message ?? e) })
-        }
-      }
+      return
     }
+    const node = nodes.find((n) => n.id === sup.id)
+    if (!node || NON_EXEC.has(node.data.kind)) return
+    // The provider emits its own status/token/result events; we only need to
+    // surface a thrown error (e.g. the needsAgent gate).
+    try {
+      const res = await runOneNode(node, nodes, edges, runId, signal, { results: Object.fromEntries(results) })
+      if (res.result) results.set(node.id, res.result)
+    } catch (e) {
+      emitEvent(runId, { type: 'error', nodeId: node.id, error: String((e as Error)?.message ?? e) })
+    }
+  }
 
+  // A finished super unlocks its successors (decrement indegree, enqueue at 0).
+  const advance = (id: string): void => {
     for (const m of adj.get(id) ?? []) {
       indeg.set(m, (indeg.get(m) ?? 0) - 1)
       if ((indeg.get(m) ?? 0) <= 0 && !done.has(m)) ready.push(m)
+    }
+  }
+
+  if (opts.parallel) {
+    const cap = Math.max(1, opts.concurrency ?? 3)
+    // Mutex key per super = its working dir, so two supers that share a dir
+    // (an explicit workingDir, or a loop body) never run concurrently.
+    const lockKey = (sup: Super): string => {
+      const repId = sup.kind === 'loop' ? sup.plan.backEdgeTargetId : sup.id
+      const node = nodes.find((n) => n.id === repId)
+      return node ? `wd:${effectiveWorkingDir(node, nodes, edges)}` : `id:${repId}`
+    }
+    const running = new Map<string, Promise<string>>()
+    const lockedDirs = new Set<string>()
+    while ((ready.length || running.size) && !signal.aborted) {
+      // Fill open slots with ready supers whose working dir isn't busy.
+      for (let i = 0; i < ready.length && running.size < cap; ) {
+        const id = ready[i]
+        const sup = superById.get(id)
+        if (!sup || done.has(id)) {
+          ready.splice(i, 1)
+          continue
+        }
+        const key = lockKey(sup)
+        if (lockedDirs.has(key)) {
+          i++ // dir busy → leave this one for a later round
+          continue
+        }
+        ready.splice(i, 1)
+        done.add(id)
+        lockedDirs.add(key)
+        running.set(
+          id,
+          runSuper(sup).then(() => {
+            lockedDirs.delete(key)
+            return id
+          }),
+        )
+      }
+      if (!running.size) break // nothing runnable right now (ready empty)
+      const finishedId = await Promise.race(running.values())
+      running.delete(finishedId)
+      advance(finishedId)
+    }
+    // Let any still-running supers settle (e.g. on abort) so none leak.
+    if (running.size) await Promise.allSettled(running.values())
+  } else {
+    while (ready.length) {
+      if (signal.aborted) break
+      const id = ready.shift()!
+      if (done.has(id)) continue
+      done.add(id)
+      const sup = superById.get(id)
+      if (!sup) continue
+      await runSuper(sup)
+      advance(id)
     }
   }
 

@@ -13,6 +13,7 @@ export async function runRoutes(app: FastifyInstance) {
     const body = req.body as {
       mode?: string
       nodeId?: string
+      parallel?: boolean
       graph?: { nodes: GraphNode[]; edges?: GraphEdge[] }
     }
     const nodes = body?.graph?.nodes ?? []
@@ -25,7 +26,7 @@ export async function runRoutes(app: FastifyInstance) {
       const bus = createBus(runId)
       runStore.createRun(runId, 'graph')
       let failed = false
-      void runGraph({ nodes, edges }, runId, bus.ac.signal)
+      void runGraph({ nodes, edges }, runId, bus.ac.signal, { parallel: body.parallel === true })
         .catch((e) => {
           failed = true
           emitEvent(runId, { type: 'error', nodeId: '', error: String((e as Error)?.message ?? e) })

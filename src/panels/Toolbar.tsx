@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { CirclePlay, Download, FilePlus2, FolderOpen, Play, Save, SaveAll, Sparkles, Square, Trash2, Upload, Wand2 } from 'lucide-react'
+import { CirclePlay, Download, FilePlus2, FolderOpen, Play, Save, SaveAll, Split, Sparkles, Square, Trash2, Upload, Wand2 } from 'lucide-react'
 import { DesignChat } from '@/panels/DesignChat'
 import { useGraphStore } from '@/store/graphStore'
 import { buildStarterGraph } from '@/io/sampleGraph'
@@ -11,7 +11,7 @@ import type { Edge } from '@xyflow/react'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-type DryStep = { id: string; iteration?: number }
+type Loop = { id: string; order: string[]; n: number }
 
 const reachOver = (start: string, adj: Map<string, string[]>): Set<string> => {
   const seen = new Set<string>([start])
@@ -55,12 +55,12 @@ function topoBody(body: Set<string>, fAdj: Map<string, string[]>, targetId: stri
 }
 
 /**
- * Build the dry-run animation sequence — loop-aware, mirroring the engine: each
- * loop body (a feedback edge that truly closes a cycle) is repeated its
- * maxIterations, tagged with the iteration number; everything else runs once in
- * topo order over forward edges.
+ * Build dry-run animation WAVES — loop-aware, mirroring the engine's
+ * condensation. Each wave holds independent super-nodes at the same topological
+ * level, so the animator runs a wave's supers together (parallel) or one-by-one
+ * (sequential). A loop super-node expands to its body × maxIterations, in order.
  */
-function dryRunSequence(nodes: FtNode[], allEdges: Edge[]): DryStep[] {
+function dryRunWaves(nodes: FtNode[], allEdges: Edge[]): { waves: string[][]; loops: Loop[] } {
   const fwd = allEdges.filter((e) => e.type !== 'feedback')
   const feedback = allEdges.filter((e) => e.type === 'feedback')
 
@@ -71,7 +71,6 @@ function dryRunSequence(nodes: FtNode[], allEdges: Edge[]): DryStep[] {
     ;(rAdj.get(e.target) ?? rAdj.set(e.target, []).get(e.target)!).push(e.source)
   }
 
-  type Loop = { id: string; order: string[]; n: number }
   const loops: Loop[] = []
   const loopOf = new Map<string, string>()
   feedback.forEach((fb, i) => {
@@ -89,7 +88,7 @@ function dryRunSequence(nodes: FtNode[], allEdges: Edge[]): DryStep[] {
     for (const nid of body) loopOf.set(nid, id)
   })
 
-  // Condensation: each loop body collapses to one super-node; topo-sort supers.
+  // Condensation: each loop body collapses to one super-node.
   const sup = (nid: string) => loopOf.get(nid) ?? nid
   const supers = new Set<string>(nodes.map((n) => sup(n.id)))
   const sAdj = new Map<string, Set<string>>()
@@ -105,7 +104,10 @@ function dryRunSequence(nodes: FtNode[], allEdges: Edge[]): DryStep[] {
       indeg.set(t, (indeg.get(t) ?? 0) + 1)
     }
   }
-  const ready = [...supers].filter((s) => (indeg.get(s) ?? 0) === 0)
+
+  // Kahn topo order (work off a copy so indeg survives for the level pass).
+  const work = new Map(indeg)
+  const ready = [...supers].filter((s) => (work.get(s) ?? 0) === 0)
   const ordered: string[] = []
   const seen = new Set<string>()
   while (ready.length) {
@@ -114,22 +116,22 @@ function dryRunSequence(nodes: FtNode[], allEdges: Edge[]): DryStep[] {
     seen.add(s)
     ordered.push(s)
     for (const t of sAdj.get(s) ?? []) {
-      indeg.set(t, (indeg.get(t) ?? 0) - 1)
-      if ((indeg.get(t) ?? 0) <= 0 && !seen.has(t)) ready.push(t)
+      work.set(t, (work.get(t) ?? 0) - 1)
+      if ((work.get(t) ?? 0) <= 0 && !seen.has(t)) ready.push(t)
     }
   }
   for (const s of supers) if (!seen.has(s)) ordered.push(s)
 
-  const steps: DryStep[] = []
+  // Longest-path level per super → group same-level supers into one wave.
+  const level = new Map<string, number>()
+  for (const s of supers) level.set(s, 0)
   for (const s of ordered) {
-    const loop = loops.find((l) => l.id === s)
-    if (loop) {
-      for (let it = 1; it <= loop.n; it++) for (const id of loop.order) steps.push({ id, iteration: it })
-    } else {
-      steps.push({ id: s })
-    }
+    for (const t of sAdj.get(s) ?? []) level.set(t, Math.max(level.get(t) ?? 0, (level.get(s) ?? 0) + 1))
   }
-  return steps
+  const maxL = ordered.length ? Math.max(...level.values()) : 0
+  const waves: string[][] = Array.from({ length: maxL + 1 }, () => [])
+  for (const s of ordered) waves[level.get(s) ?? 0].push(s)
+  return { waves: waves.filter((w) => w.length), loops }
 }
 
 const CURRENT_KEY = 'ft.currentFlow'
@@ -144,6 +146,13 @@ export function Toolbar() {
   const [dirtyMsg, setDirtyMsg] = useState<string>('')
   const [menuOpen, setMenuOpen] = useState(false)
   const [designOpen, setDesignOpen] = useState(false)
+  const [parallel, setParallel] = useState(() => localStorage.getItem('ft.parallel') === '1')
+
+  const toggleParallel = () => {
+    const v = !parallel
+    setParallel(v)
+    localStorage.setItem('ft.parallel', v ? '1' : '0')
+  }
 
   const refresh = useCallback(() => listFlows().then(setFlows), [])
   useEffect(() => void refresh(), [refresh])
@@ -223,12 +232,29 @@ export function Toolbar() {
   const onDemoRun = async () => {
     const st = useGraphStore.getState()
     st.resetRun()
-    for (const step of dryRunSequence(st.nodes, st.edges)) {
-      const iter = step.iteration ? { iteration: step.iteration } : {}
-      st.setRunState(step.id, { status: 'running', ...iter })
-      st.setActiveEdges(st.edges.filter((e) => e.source === step.id).map((e) => e.id))
-      await sleep(450)
-      st.setRunState(step.id, { status: 'done', ...iter })
+    const { waves, loops } = dryRunWaves(st.nodes, st.edges)
+    const edgesFrom = (id: string) => st.edges.filter((e) => e.source === id).map((e) => e.id)
+
+    // Animate one super-node: a loop expands to body × maxIterations, in order.
+    const animate = async (superId: string) => {
+      const loop = loops.find((l) => l.id === superId)
+      const seq: { id: string; iteration?: number }[] = loop
+        ? Array.from({ length: loop.n }, (_, k) => loop.order.map((id) => ({ id, iteration: k + 1 }))).flat()
+        : [{ id: superId }]
+      for (const step of seq) {
+        const iter = step.iteration ? { iteration: step.iteration } : {}
+        st.setRunState(step.id, { status: 'running', ...iter })
+        st.setActiveEdges(edgesFrom(step.id))
+        await sleep(450)
+        st.setRunState(step.id, { status: 'done', ...iter })
+      }
+    }
+
+    // Each wave is a set of independent nodes: run them together when Parallel
+    // is on (so the animation mirrors the real engine), else one at a time.
+    for (const wave of waves) {
+      if (parallel) await Promise.all(wave.map(animate))
+      else for (const s of wave) await animate(s)
     }
     st.setActiveEdges([])
   }
@@ -346,23 +372,42 @@ export function Toolbar() {
         >
           <Play className="size-3.5" /> Dry Run
         </button>
-        {currentRunId ? (
+        {/* Run-mode toggle JOINED to Run Graph, so it reads as "the mode this run uses". */}
+        <div className="flex items-center">
           <button
-            className={btn + ' !border-red-400/40 !bg-red-500/15 text-red-200 hover:!bg-red-500/25'}
-            onClick={() => void stopCurrentRun()}
-            title="Stop the running graph"
+            onClick={toggleParallel}
+            title={
+              parallel
+                ? 'Parallel: independent same-stage nodes run concurrently (cap 3, working-dir-guarded). Click for sequential.'
+                : 'Sequential: one node at a time (safe). Click to run independent nodes in parallel.'
+            }
+            className={
+              'flex items-center gap-1 rounded-l-md border border-r-0 px-2 py-1 text-xs transition ' +
+              (parallel
+                ? 'border-violet-400/60 bg-violet-500/30 text-violet-50 hover:bg-violet-500/40'
+                : 'border-border/10 bg-field text-fg/60 hover:bg-fg/[0.08]')
+            }
           >
-            <Square className="size-3.5" /> Stop
+            <Split className="size-3.5" /> {parallel ? 'Parallel' : 'Sequential'}
           </button>
-        ) : (
-          <button
-            className={btn + ' !border-emerald-400/40 !bg-emerald-500/15 text-emerald-200 hover:!bg-emerald-500/25'}
-            onClick={() => void runGraph()}
-            title="Run the whole graph: every node in dependency order, iterating any loops until they pass or hit the cap."
-          >
-            <CirclePlay className="size-3.5" /> Run Graph
-          </button>
-        )}
+          {currentRunId ? (
+            <button
+              className="flex items-center gap-1.5 rounded-r-md border border-red-400/40 bg-red-500/15 px-2.5 py-1 text-xs text-red-200 transition hover:bg-red-500/25"
+              onClick={() => void stopCurrentRun()}
+              title="Stop the running graph"
+            >
+              <Square className="size-3.5" /> Stop
+            </button>
+          ) : (
+            <button
+              className="flex items-center gap-1.5 rounded-r-md border border-emerald-400/40 bg-emerald-500/15 px-2.5 py-1 text-xs text-emerald-200 transition hover:bg-emerald-500/25"
+              onClick={() => void runGraph(parallel)}
+              title="Run the whole graph in dependency order, iterating any loops until they pass or hit the cap."
+            >
+              <CirclePlay className="size-3.5" /> Run Graph
+            </button>
+          )}
+        </div>
       </div>
 
       {designOpen && <DesignChat onClose={() => setDesignOpen(false)} workflow={current} />}
