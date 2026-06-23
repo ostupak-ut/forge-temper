@@ -66,8 +66,10 @@ function handle(ev: RunEvent) {
 /** Execute a single node via the backend and stream its events into the store. */
 export async function runSingleNode(nodeId: string): Promise<void> {
   const st = useGraphStore.getState()
-  st.resetRun()
-  st.setRunState(nodeId, { status: 'queued' })
+  // Reset ONLY this node — every other node keeps its prior status/result so a
+  // single-node retry never wipes the rest of the flow. The backend reuses the
+  // other nodes' saved outputs as this node's upstream context.
+  st.setRunState(nodeId, { status: 'queued', tail: '', error: undefined, result: undefined })
   const { nodes, edges } = st
 
   let runId: string | undefined
@@ -123,7 +125,7 @@ function subscribe(runId: string): void {
  * engine compiles the flat cyclic graph, runs nodes sequentially, and iterates
  * the Forge↔Temper cycle through the loop driver.
  */
-export async function runGraph(parallel = false): Promise<void> {
+export async function runGraph(parallel = false, concurrency?: number): Promise<void> {
   const st = useGraphStore.getState()
   st.resetRun()
   const { nodes, edges } = st
@@ -133,7 +135,7 @@ export async function runGraph(parallel = false): Promise<void> {
     const res = await fetch('/api/runs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: 'graph', parallel, graph: { nodes, edges } }),
+      body: JSON.stringify({ mode: 'graph', parallel, concurrency, graph: { nodes, edges } }),
     })
     const json = await res.json()
     runId = json.runId

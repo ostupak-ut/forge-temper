@@ -36,6 +36,7 @@ const STATUS_PILL: Record<NodeRunStatus, string> = {
   done: 'bg-emerald-400/20 text-emerald-300',
   error: 'bg-red-500/20 text-red-300',
   skipped: 'bg-fg/5 text-fg/30',
+  waiting: 'bg-sky-400/20 text-sky-300',
 }
 
 const inputCls =
@@ -100,6 +101,7 @@ const GROUP_PRIORITY: Record<string, number> = {
   Idea: 0,
   Card: 1,
   Prompt: 2,
+  Flow: 2.5,
   Verification: 3,
   Model: 4,
   Files: 5,

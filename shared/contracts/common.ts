@@ -90,5 +90,8 @@ export const NodeRunStatus = z.enum([
   'done',
   'error',
   'skipped',
+  // Held: node requires all inputs, but an upstream failed/was held — it WAITS
+  // (does not run on partial input) until you fix the upstream and re-run.
+  'waiting',
 ])
 export type NodeRunStatus = z.infer<typeof NodeRunStatus>

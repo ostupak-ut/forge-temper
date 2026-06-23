@@ -14,6 +14,7 @@ export async function runRoutes(app: FastifyInstance) {
       mode?: string
       nodeId?: string
       parallel?: boolean
+      concurrency?: number
       graph?: { nodes: GraphNode[]; edges?: GraphEdge[] }
     }
     const nodes = body?.graph?.nodes ?? []
@@ -26,7 +27,12 @@ export async function runRoutes(app: FastifyInstance) {
       const bus = createBus(runId)
       runStore.createRun(runId, 'graph')
       let failed = false
-      void runGraph({ nodes, edges }, runId, bus.ac.signal, { parallel: body.parallel === true })
+      void runGraph({ nodes, edges }, runId, bus.ac.signal, {
+        parallel: body.parallel === true,
+        ...(typeof body.concurrency === 'number' && body.concurrency > 0
+          ? { concurrency: Math.floor(body.concurrency) }
+          : {}),
+      })
         .catch((e) => {
           failed = true
           emitEvent(runId, { type: 'error', nodeId: '', error: String((e as Error)?.message ?? e) })
@@ -48,9 +54,14 @@ export async function runRoutes(app: FastifyInstance) {
     const bus = createBus(runId)
     runStore.createRun(runId, `single:${node.data.kind}`)
 
+    // Resume: reuse upstream nodes' saved outputs so re-running ONE node has its
+    // real context (text {{vars}} + the files already staged on disk) without
+    // replaying the whole graph.
+    const priorOutputs = runStore.getLatestOutputs()
+
     void (async () => {
       try {
-        await runOneNode(node, nodes, edges, runId, bus.ac.signal)
+        await runOneNode(node, nodes, edges, runId, bus.ac.signal, { results: priorOutputs })
         runStore.finishRun(runId, bus.ac.signal.aborted ? 'stopped' : 'done')
         emitEvent(runId, { type: 'run-done', status: bus.ac.signal.aborted ? 'stopped' : 'done' })
       } catch (e) {

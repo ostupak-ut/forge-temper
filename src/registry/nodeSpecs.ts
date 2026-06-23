@@ -77,6 +77,13 @@ function agentFields(opts: { skill?: string; promptHelp?: string }): FieldDescri
       group: 'Execution',
       help: 'Defaults to the paper version directory.',
     },
+    {
+      key: 'requireAllInputs',
+      label: 'Wait for all inputs',
+      kind: 'boolean',
+      group: 'Flow',
+      help: 'Only run once EVERY upstream input has succeeded. If any upstream agent failed or is still held, this node WAITS (it does not run on partial input) — fix the upstream and re-run it, and this node picks up the full set. Off (default) = run with whatever arrived.',
+    },
   ]
 }
 
@@ -88,6 +95,7 @@ const agentDefaults = (skill = '') => ({
   systemAppend: '',
   skill,
   workingDir: '',
+  requireAllInputs: false,
 })
 
 export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
@@ -269,8 +277,10 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
           { label: 'Bash', value: 'Bash' },
           { label: 'Glob', value: 'Glob' },
           { label: 'Grep', value: 'Grep' },
+          { label: 'WebSearch', value: 'WebSearch' },
+          { label: 'WebFetch', value: 'WebFetch' },
         ],
-        help: 'Which tools this agent may use (bypassPermissions still applies).',
+        help: 'Which tools this agent may use (bypassPermissions still applies). Enable WebSearch/WebFetch for research agents on Claude Code (native web access instead of curl).',
       },
       {
         key: 'verifier',

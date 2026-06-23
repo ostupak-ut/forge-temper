@@ -52,10 +52,18 @@ function buildCatalog() {
   })
 }
 
-export function buildSystemPrompt(): string {
+export function buildSystemPrompt(context?: string): string {
   return [
     'You are the workflow architect for "forge-temper", a visual tool for wiring AI agents into pipelines. Design a directed graph of typed nodes that satisfies the user request — for ANY kind of multi-step agent workflow, not just academic ones.',
     '',
+    ...(context && context.trim()
+      ? [
+          'CONTEXT — build AROUND what already exists; do NOT ignore it:',
+          context.trim(),
+          'If the user has files or a partial graph already, incorporate them: add File nodes whose paths point to the existing files and wire them into the agents that need them, and keep/extend useful existing nodes. Design the workflow to actually USE what is there.',
+          '',
+        ]
+      : []),
     'NODE CATALOG (kind → ports & config keys):',
     JSON.stringify(buildCatalog()),
     '',
@@ -73,9 +81,11 @@ export function buildSystemPrompt(): string {
       ICON_NAMES.join(', ') +
       '. e.g. research/search → Search or Microscope; analysis/risk/cost → Calculator or Scale; writing → PenTool; editing → Feather; planning/calendar → Compass; ideas/recommendations → Lightbulb; building/compiling → Hammer or Code; validation → Shield; reporting → BookOpen. Vary the colors so adjacent agents differ.',
     '',
+    'MODEL SELECTION: set config.model and config.effort per node to fit the task — do NOT default everything to the biggest model. Heavy reasoning / synthesis / verification / long-form writing → "claude-opus-4-8" + effort "high". Everyday drafting / transformation → "claude-sonnet-4-6" + effort "medium". Light / mechanical work (formatting, extraction, classification, simple lookups, splitting, merging) → "claude-haiku-4-5" + effort "low". Prefer the lighter, faster model whenever a step is simple; reserve Opus for the genuinely hard nodes. If unsure, omit config.model (it inherits the session default).',
+    '',
     'OUTPUT FORMAT: reply with ONE or two sentences of explanation, then a SINGLE fenced ```json block of exactly this shape:',
-    '{"nodes":[{"id":"n1","kind":"<catalog kind>","label":"...","config":{"prompt":"...","symbol":"Search","color":"#0ea5e9"}}],"edges":[{"from":"n1","fromPort":"<output id>","to":"n2","toPort":"<input id>","feedback":false}]}',
-    'RULES: default to "custom" agents (plus idea/file/warehouse) for general requests; only use forge/temper/body/literature/assemble when the user explicitly wants the paper pipeline. Use the EXACT port ids from the catalog (for custom agents that means "in"/"out"); give every node a unique id, a descriptive label, a fitting config.symbol and a fun config.color; for agent nodes set a useful config.prompt; set "feedback":true ONLY on an edge that closes a loop; do NOT include x/y positions (auto-laid-out). Keep it minimal and valid.',
+    '{"nodes":[{"id":"n1","kind":"<catalog kind>","label":"...","config":{"prompt":"...","model":"claude-sonnet-4-6","effort":"medium","symbol":"Search","color":"#0ea5e9"}}],"edges":[{"from":"n1","fromPort":"<output id>","to":"n2","toPort":"<input id>","feedback":false}]}',
+    'RULES: default to "custom" agents (plus idea/file/warehouse) for general requests; only use forge/temper/body/literature/assemble when the user explicitly wants the paper pipeline. Use the EXACT port ids from the catalog (for custom agents that means "in"/"out"); give every node a unique id, a descriptive label, a fitting config.symbol, a fun config.color, and a task-appropriate config.model/effort; for agent nodes set a useful config.prompt; set "feedback":true ONLY on an edge that closes a loop; do NOT include x/y positions (auto-laid-out). Keep it minimal and valid.',
   ].join('\n')
 }
 
@@ -83,11 +93,14 @@ export async function requestDesign(
   provider: string,
   model: string,
   messages: ChatMsg[],
+  context?: string,
+  signal?: AbortSignal,
 ): Promise<string> {
   const r = await fetch('/api/design', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ provider, model, system: buildSystemPrompt(), messages }),
+    body: JSON.stringify({ provider, model, system: buildSystemPrompt(context), messages }),
+    signal,
   })
   const d = await r.json()
   if (!d.ok) throw new Error(d.error ?? 'design request failed')

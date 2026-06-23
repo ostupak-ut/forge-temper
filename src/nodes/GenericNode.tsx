@@ -21,6 +21,7 @@ const STATUS_RING: Record<NodeRunStatus, string> = {
   done: 'ring-emerald-400/70',
   error: 'ring-red-500/80',
   skipped: 'ring-transparent',
+  waiting: 'ring-sky-400/60',
 }
 
 const STATUS_DOT: Record<NodeRunStatus, string> = {
@@ -30,6 +31,7 @@ const STATUS_DOT: Record<NodeRunStatus, string> = {
   done: 'bg-emerald-400',
   error: 'bg-red-500',
   skipped: 'bg-fg/10',
+  waiting: 'bg-sky-400',
 }
 
 function dotStyle(type: Port['type'], side: 'left' | 'right'): CSSProperties {

@@ -58,6 +58,37 @@ function hydrate(msgs: ChatMsg[]): Turn[] {
 
 const strip = (turns: Turn[]): ChatMsg[] => turns.map((t) => ({ role: t.role, content: t.content }))
 
+/** Snapshot of what already exists — current canvas + Library files — so the
+ * designer can build AROUND it (e.g. wire in a file the user already dropped). */
+async function gatherContext(): Promise<string> {
+  const parts: string[] = []
+  const nodes = useGraphStore.getState().nodes
+  if (nodes.length) {
+    const lines = nodes.map((n) => {
+      const cfg = n.data.config as Record<string, unknown>
+      const paths = Array.isArray(cfg?.paths) ? (cfg.paths as unknown[]).map(String) : []
+      const extra = n.data.kind === 'file' && paths.length ? ` → ${paths.join(', ')}` : ''
+      return `  - "${n.data.label}" (${n.data.kind})${extra}`
+    })
+    parts.push(`Current canvas (${nodes.length} node${nodes.length === 1 ? '' : 's'}):\n${lines.join('\n')}`)
+  }
+  try {
+    const r = await fetch('/api/fs/list?path=library')
+    const d = await r.json()
+    const items = (d.items ?? []) as { name: string; dir: boolean; rel: string }[]
+    if (items.length) {
+      parts.push(
+        `Files already in the Library (use these paths in File nodes):\n${items
+          .map((i) => `  - ${i.rel}${i.dir ? '/' : ''}`)
+          .join('\n')}`,
+      )
+    }
+  } catch {
+    /* library may be empty / unreachable — fine */
+  }
+  return parts.join('\n\n')
+}
+
 export function DesignChat({ onClose, workflow }: { onClose: () => void; workflow: string | null }) {
   const setGraph = useGraphStore((s) => s.setGraph)
   const prefs = loadDesignPrefs()
@@ -74,9 +105,16 @@ export function DesignChat({ onClose, workflow }: { onClose: () => void; workflo
   const [turns, setTurns] = useState<Turn[]>(() => hydrate(loadDesignChat(workflow)))
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
+  const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState('')
   const [appliedAt, setAppliedAt] = useState<number | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
+
+  // Abort any in-flight request if the panel closes.
+  useEffect(() => () => abortRef.current?.abort(), [])
+
+  const cancel = () => abortRef.current?.abort()
 
   // Reload this workflow's saved conversation when the active flow changes.
   useEffect(() => {
@@ -114,9 +152,11 @@ export function DesignChat({ onClose, workflow }: { onClose: () => void; workflo
 
   const newChat = () => {
     if (turns.length && !window.confirm('Start a new chat? This clears the saved conversation for this workflow.')) return
+    abortRef.current?.abort() // kill any in-flight design (server aborts its subprocess too)
     setTurns([])
     clearDesignChat(workflow)
     setError('')
+    setBusy(false)
   }
 
   const send = async () => {
@@ -127,9 +167,15 @@ export function DesignChat({ onClose, workflow }: { onClose: () => void; workflo
     setTurns(withUser)
     saveDesignChat(workflow, strip(withUser))
     setInput('')
+    const ac = new AbortController()
+    abortRef.current = ac
     setBusy(true)
+    setElapsed(0)
+    const startedAt = Date.now()
+    const timer = window.setInterval(() => setElapsed(Math.round((Date.now() - startedAt) / 1000)), 500)
     try {
-      const reply = await requestDesign(provider, model, strip(withUser))
+      const context = await gatherContext()
+      const reply = await requestDesign(provider, model, strip(withUser), context, ac.signal)
       const graph = parseGraph(reply)
       const next: Turn[] = [
         ...withUser,
@@ -138,9 +184,12 @@ export function DesignChat({ onClose, workflow }: { onClose: () => void; workflo
       setTurns(next)
       saveDesignChat(workflow, strip(next))
     } catch (e) {
-      setError(String((e as Error)?.message ?? e))
+      if (!ac.signal.aborted) setError(String((e as Error)?.message ?? e))
+    } finally {
+      window.clearInterval(timer)
+      abortRef.current = null
+      setBusy(false)
     }
-    setBusy(false)
   }
 
   const apply = (g: ParsedGraph) => {
@@ -249,7 +298,21 @@ export function DesignChat({ onClose, workflow }: { onClose: () => void; workflo
               </div>
             </div>
           ))}
-          {busy && <p className="text-xs text-fg/40">Designing…</p>}
+          {busy && (
+            <div className="flex items-center gap-2 text-xs text-fg/55">
+              <span className="inline-block size-3.5 shrink-0 animate-spin rounded-full border-2 border-temper/30 border-t-temper" />
+              <span>
+                Designing… {elapsed}s
+                {elapsed >= 20 ? ' · big models can take a minute' : ''}
+              </span>
+              <button
+                onClick={cancel}
+                className="rounded border border-border/15 px-1.5 py-0.5 text-[11px] text-fg/60 hover:bg-fg/10 hover:text-fg/90"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
           {error && <p className="text-xs text-rose-400">{error}</p>}
           {appliedAt && <p className="text-center text-xs text-emerald-300">Applied to canvas ✓</p>}
         </div>

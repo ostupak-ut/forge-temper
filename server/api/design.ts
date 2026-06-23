@@ -59,9 +59,13 @@ async function claudeComplete(opts: {
     allowDangerouslySkipPermissions: true,
     disallowedTools: ['Skill'],
     allowedTools: [],
-    settingSources: ['user', 'project', 'local'],
-    systemPrompt: { type: 'preset', preset: 'claude_code', append: opts.system },
-    maxTurns: 2,
+    // One-shot text generation: DON'T load user/project settings — that starts
+    // MCP servers + hooks (slow, and a hung MCP startup stalls the whole call).
+    // A plain system prompt (no claude_code agent preset) + a single turn keeps
+    // it fast and predictable.
+    settingSources: [],
+    systemPrompt: opts.system,
+    maxTurns: 1,
     ...(opts.model && opts.model !== 'inherit' ? { model: opts.model } : {}),
     ...(getCli('claude') ? { pathToClaudeCodeExecutable: getCli('claude') } : {}),
   }
@@ -163,7 +167,22 @@ export async function designRoutes(app: FastifyInstance) {
 
     // NOTE: don't abort on req.raw 'close' — it fires when the request body
     // finishes, not on client disconnect, and would kill the call instantly.
+    // A watchdog aborts a genuinely hung provider call so the request can't hang
+    // forever (the UI also lets the user cancel).
     const ac = new AbortController()
+    const TIMEOUT_MS = 5 * 60 * 1000
+    let timedOut = false
+    const watchdog = setTimeout(() => {
+      timedOut = true
+      ac.abort()
+    }, TIMEOUT_MS)
+
+    // Client disconnect (Cancel / New chat / closed panel) → abort the provider
+    // call so its claude/codex subprocess is killed instead of orphaned. Guarded
+    // by writableFinished so a normally-sent response doesn't trigger it.
+    reply.raw.on('close', () => {
+      if (!reply.raw.writableFinished) ac.abort()
+    })
 
     try {
       let text: string
@@ -180,7 +199,12 @@ export async function designRoutes(app: FastifyInstance) {
       }
       return { ok: true, text }
     } catch (e) {
-      return reply.code(500).send({ ok: false, error: String((e as Error)?.message ?? e) })
+      const error = timedOut
+        ? `Timed out after ${TIMEOUT_MS / 1000}s — the model took too long. Try a smaller request or a faster model (Sonnet/Haiku).`
+        : String((e as Error)?.message ?? e)
+      return reply.code(500).send({ ok: false, error })
+    } finally {
+      clearTimeout(watchdog)
     }
   })
 }

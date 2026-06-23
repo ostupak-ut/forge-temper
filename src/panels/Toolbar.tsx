@@ -147,11 +147,17 @@ export function Toolbar() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [designOpen, setDesignOpen] = useState(false)
   const [parallel, setParallel] = useState(() => localStorage.getItem('ft.parallel') === '1')
+  const [concurrency, setConcurrency] = useState(() => Number(localStorage.getItem('ft.concurrency')) || 2)
 
   const toggleParallel = () => {
     const v = !parallel
     setParallel(v)
     localStorage.setItem('ft.parallel', v ? '1' : '0')
+  }
+
+  const changeConcurrency = (n: number) => {
+    setConcurrency(n)
+    localStorage.setItem('ft.concurrency', String(n))
   }
 
   const refresh = useCallback(() => listFlows().then(setFlows), [])
@@ -378,7 +384,7 @@ export function Toolbar() {
             onClick={toggleParallel}
             title={
               parallel
-                ? 'Parallel: independent same-stage nodes run concurrently (cap 3, working-dir-guarded). Click for sequential.'
+                ? 'Parallel: independent same-stage nodes run concurrently (max set to the right, working-dir-guarded). Click for sequential.'
                 : 'Sequential: one node at a time (safe). Click to run independent nodes in parallel.'
             }
             className={
@@ -390,6 +396,15 @@ export function Toolbar() {
           >
             <Split className="size-3.5" /> {parallel ? 'Parallel' : 'Sequential'}
           </button>
+          {parallel && (
+            <button
+              onClick={() => changeConcurrency(concurrency >= 6 ? 1 : concurrency + 1)}
+              title="Max agents running at once (click to cycle 1–6). Lower to 1–2 if Claude returns 500 / 'overloaded' on big outputs."
+              className="border border-l-0 border-violet-400/60 bg-violet-500/30 px-2 py-1 text-xs font-medium tabular-nums text-violet-50 transition hover:bg-violet-500/40"
+            >
+              {concurrency}×
+            </button>
+          )}
           {currentRunId ? (
             <button
               className="flex items-center gap-1.5 rounded-r-md border border-red-400/40 bg-red-500/15 px-2.5 py-1 text-xs text-red-200 transition hover:bg-red-500/25"
@@ -401,7 +416,7 @@ export function Toolbar() {
           ) : (
             <button
               className="flex items-center gap-1.5 rounded-r-md border border-emerald-400/40 bg-emerald-500/15 px-2.5 py-1 text-xs text-emerald-200 transition hover:bg-emerald-500/25"
-              onClick={() => void runGraph(parallel)}
+              onClick={() => void runGraph(parallel, concurrency)}
               title="Run the whole graph in dependency order, iterating any loops until they pass or hit the cap."
             >
               <CirclePlay className="size-3.5" /> Run Graph

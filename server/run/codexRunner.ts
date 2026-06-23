@@ -54,12 +54,19 @@ export function resolveCodexBin(): string {
       } catch {
         continue
       }
-      // The extension ships several platform folders (e.g. linux-x86_64,
-      // windows-x86_64). Only the host-OS binary is runnable — returning a
-      // foreign one ENOENTs on spawn — so match the current platform first.
-      const platToken = process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'darwin' : 'linux'
+      // The extension ships several platform folders. Naming varies by version
+      // (e.g. darwin-arm64 OR macos-aarch64, linux-x86_64, windows-x86_64). Only
+      // the host-OS binary is runnable — a foreign one ENOENTs on spawn — so
+      // match the current platform against ALL its known aliases.
+      const platTokens =
+        process.platform === 'win32'
+          ? ['windows', 'win']
+          : process.platform === 'darwin'
+            ? ['darwin', 'macos', 'mac', 'osx', 'apple']
+            : ['linux']
       for (const plat of plats) {
-        if (!plat.toLowerCase().startsWith(platToken)) continue
+        const pl = plat.toLowerCase()
+        if (!platTokens.some((t) => pl.startsWith(t) || pl.includes(t))) continue
         // Windows ships codex.exe; macOS/Linux ship a bare `codex`.
         for (const name of ['codex.exe', 'codex']) {
           const cand = path.join(binDir, plat, name)

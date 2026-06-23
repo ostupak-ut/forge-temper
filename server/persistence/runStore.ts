@@ -92,4 +92,22 @@ export const runStore = {
     const nodes = db.prepare(`SELECT * FROM node_runs WHERE run_id=?`).all(id) as Record<string, unknown>[]
     return run ? { ...run, nodes } : null
   },
+  /**
+   * Latest successful text output for every node id, across ALL runs — the basis
+   * for resuming: re-running one node reuses upstream nodes' saved outputs
+   * instead of replaying the whole graph. (SQLite bare-column + MAX() returns the
+   * row at the max.)
+   */
+  getLatestOutputs(): Record<string, string> {
+    const rows = db
+      .prepare(
+        `SELECT node_id, result FROM node_runs
+         WHERE result IS NOT NULL AND status='done'
+         GROUP BY node_id HAVING MAX(COALESCE(ended_at, started_at))`,
+      )
+      .all() as { node_id: string; result: string }[]
+    const out: Record<string, string> = {}
+    for (const r of rows) if (r.result) out[r.node_id] = r.result
+    return out
+  },
 }

@@ -50,24 +50,53 @@ export async function schedule(
   // (via valueForSource) to downstream agents. loopcontrol is config-only too.
   const NON_EXEC = new Set(['idea', 'file', 'infocard', 'loopcontrol'])
 
-  // Execute one super-node, recording its output for downstream nodes.
-  const runSuper = async (sup: Super): Promise<void> => {
+  // --- "Wait for all inputs" gate ---------------------------------------------
+  // A node with config.requireAllInputs only runs if EVERY upstream super
+  // succeeded; otherwise it (and, by cascade, its dependents) is skipped instead
+  // of running on partial input. okById tracks each super's success.
+  const okById = new Map<string, boolean>()
+  const superPreds = new Map<string, string[]>()
+  for (const e of compiled.superEdges) {
+    if (!superById.has(e.source) || !superById.has(e.target)) continue
+    ;(superPreds.get(e.target) ?? superPreds.set(e.target, []).get(e.target)!).push(e.source)
+  }
+  const repNodeOf = (sup: Super): GraphNode | undefined =>
+    sup.kind === 'loop'
+      ? nodes.find((n) => n.id === sup.plan.backEdgeTargetId)
+      : nodes.find((n) => n.id === sup.id)
+  const gateBlocks = (sup: Super): boolean => {
+    const n = repNodeOf(sup)
+    if (!(n && (n.data.config as Record<string, unknown> | undefined)?.requireAllInputs)) return false
+    return (superPreds.get(sup.id) ?? []).some((p) => okById.get(p) === false)
+  }
+  // Held (not run): waits for all inputs. Marked 'waiting', not 'skipped' — the
+  // branch isn't abandoned; fix the upstream and re-run to let it proceed.
+  const emitWaiting = (sup: Super): void => {
+    const ids = sup.kind === 'loop' ? sup.plan.bodyOrder : [sup.id]
+    for (const nid of ids) emitEvent(runId, { type: 'status', nodeId: nid, status: 'waiting' })
+  }
+
+  // Execute one super-node, recording its output for downstream nodes. Returns
+  // whether it SUCCEEDED (drives the wait-for-all-inputs gate).
+  const runSuper = async (sup: Super): Promise<boolean> => {
     if (sup.kind === 'loop') {
       const report = await runLoop(sup.plan, nodes, edges, runId, signal, undefined, Object.fromEntries(results))
       // Expose the loop's output under its verdict source (e.g. Temper) so
       // downstream nodes wired from it pick it up.
       if (report) results.set(sup.plan.verdictSourceId, report)
-      return
+      return report != null
     }
     const node = nodes.find((n) => n.id === sup.id)
-    if (!node || NON_EXEC.has(node.data.kind)) return
+    if (!node || NON_EXEC.has(node.data.kind)) return true
     // The provider emits its own status/token/result events; we only need to
     // surface a thrown error (e.g. the needsAgent gate).
     try {
       const res = await runOneNode(node, nodes, edges, runId, signal, { results: Object.fromEntries(results) })
       if (res.result) results.set(node.id, res.result)
+      return res.ok
     } catch (e) {
       emitEvent(runId, { type: 'error', nodeId: node.id, error: String((e as Error)?.message ?? e) })
+      return false
     }
   }
 
@@ -99,6 +128,15 @@ export async function schedule(
           ready.splice(i, 1)
           continue
         }
+        // Wait-for-all-inputs: skip (don't run) if an upstream super failed.
+        if (gateBlocks(sup)) {
+          ready.splice(i, 1)
+          done.add(id)
+          okById.set(id, false)
+          emitWaiting(sup)
+          advance(id)
+          continue
+        }
         const key = lockKey(sup)
         if (lockedDirs.has(key)) {
           i++ // dir busy → leave this one for a later round
@@ -109,7 +147,8 @@ export async function schedule(
         lockedDirs.add(key)
         running.set(
           id,
-          runSuper(sup).then(() => {
+          runSuper(sup).then((ok) => {
+            okById.set(id, ok)
             lockedDirs.delete(key)
             return id
           }),
@@ -130,7 +169,14 @@ export async function schedule(
       done.add(id)
       const sup = superById.get(id)
       if (!sup) continue
-      await runSuper(sup)
+      // Wait-for-all-inputs: skip (don't run) if an upstream super failed.
+      if (gateBlocks(sup)) {
+        okById.set(id, false)
+        emitWaiting(sup)
+        advance(id)
+        continue
+      }
+      okById.set(id, await runSuper(sup))
       advance(id)
     }
   }
