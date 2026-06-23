@@ -236,7 +236,7 @@ export async function runOneNode(
 ): Promise<RunOneResult> {
   // The Warehouse node is a result sink, not an agent — it archives upstream
   // artifacts into an indexed pile instead of running a provider.
-  if (node.data.kind === 'warehouse') return archiveWarehouse(node, nodes, edges, runId)
+  if (node.data.kind === 'warehouse') return archiveWarehouse(node, nodes, edges, runId, opts.results ?? {})
 
   const cfg = node.data.config ?? {}
   const cwd = resolveCwd(effectiveWorkingDir(node, nodes, edges))
@@ -383,25 +383,32 @@ const EXT_FILTER: Record<string, string[] | null> = {
   pdf: ['.pdf'],
   md: ['.md'],
   tex: ['.tex'],
+  img: ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg', '.avif'],
   all: null,
 }
 /** LaTeX build junk never worth piling, even under "Everything". */
-const JUNK_EXT = new Set(['.aux', '.fls', '.fdb_latexmk', '.log', '.out', '.toc', '.synctex', '.gz'])
+const JUNK_EXT = new Set(['.aux', '.fls', '.fdb_latexmk', '.log', '.out', '.toc', '.synctex'])
 
 async function archiveWarehouse(
   node: GraphNode,
   nodes: GraphNode[],
   edges: GraphEdge[],
   runId: string,
+  upstream: Record<string, string>,
 ): Promise<RunOneResult> {
   emitEvent(runId, { type: 'status', nodeId: node.id, status: 'running' })
   runStore.upsertNodeRun({ runId, nodeId: node.id, kind: node.data.kind, status: 'running' })
 
   const cfg = node.data.config ?? {}
-  const collect = typeof cfg.collect === 'string' ? cfg.collect : 'pdf'
-  const exts = collect in EXT_FILTER ? EXT_FILTER[collect] : EXT_FILTER.pdf
+  // Default to 'all' — the warehouse is a catch-all sink; a specific type is
+  // just an optional filter. Unknown/legacy values (e.g. an old saved graph)
+  // also fall through to 'all' rather than the narrowest filter.
+  const collect = typeof cfg.collect === 'string' ? cfg.collect : 'all'
+  const exts = collect in EXT_FILTER ? EXT_FILTER[collect] : EXT_FILTER.all
   const matches = (name: string): boolean => {
-    const ext = path.extname(name).toLowerCase()
+    const lower = name.toLowerCase()
+    if (lower.endsWith('.synctex.gz')) return false // latex build junk; other .gz are kept
+    const ext = path.extname(lower)
     return exts ? exts.includes(ext) : !JUNK_EXT.has(ext)
   }
 
@@ -417,6 +424,7 @@ async function archiveWarehouse(
   const runDir = path.join(base, `run-${idx}-${ts}`)
 
   let count = 0
+  const skipped: string[] = [] // output files found but excluded by the filter — used for a helpful message
   const srcEdges = edges.filter((e) => e.target === node.id && e.type !== 'feedback' && !e.data?.loopBackEdge)
   for (const e of srcEdges) {
     const src = nodes.find((n) => n.id === e.source)
@@ -437,7 +445,10 @@ async function archiveWarehouse(
         if (ent.name === 'inputs' || ent.name === 'node_modules' || ent.name === '.git') continue
         const rChild = rel ? `${rel}/${ent.name}` : ent.name
         if (ent.isDirectory()) walkOut(path.join(dir, ent.name), rChild)
-        else if (!ent.name.startsWith('.skill-') && matches(ent.name)) hits.push(rChild)
+        else if (!ent.name.startsWith('.skill-')) {
+          if (matches(ent.name)) hits.push(rChild)
+          else skipped.push(ent.name)
+        }
       }
     }
     walkOut(srcCwd, '')
@@ -455,10 +466,27 @@ async function archiveWarehouse(
   }
 
   const rel = path.relative(getWorkspaceDir(), runDir).split(path.sep).join('/')
-  const result =
-    count > 0 ? `Archived ${count} file(s) → ${rel}` : `Nothing matched (collect: ${collect}) — no run folder created.`
+  let result: string
+  if (count > 0) {
+    result = `Archived ${count} file(s) → ${rel}`
+  } else if (skipped.length) {
+    // Files existed but the filter excluded them — tell the user exactly what + how to fix.
+    const sample = [...new Set(skipped)].slice(0, 6).join(', ')
+    result = `Nothing archived — Collect is "${collect}" but the output files found were: ${sample}. Set Collect to "Everything" to keep them.`
+  } else {
+    result = `Nothing to archive — the upstream agent(s) wrote no output files to disk.`
+  }
   emitEvent(runId, { type: 'result', nodeId: node.id, ok: true, result })
   emitEvent(runId, { type: 'status', nodeId: node.id, status: 'done' })
   runStore.upsertNodeRun({ runId, nodeId: node.id, status: 'done', result, structured: { dir: rel, count } })
-  return { ok: true, result }
+
+  // Pass-through tap: forward the merged upstream output so a node wired from
+  // this warehouse's `out` still receives the content (it was archived too).
+  // The visible node result stays the archive summary; only the threaded value
+  // downstream becomes the content. Falls back to the summary if there's none.
+  const forwarded = srcEdges
+    .map((e) => upstream[e.source])
+    .filter((v): v is string => typeof v === 'string' && v.length > 0)
+    .join('\n\n')
+  return { ok: true, result: forwarded || result }
 }

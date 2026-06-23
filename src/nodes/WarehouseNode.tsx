@@ -22,6 +22,10 @@ const inHandle: CSSProperties = {
   border: '2px solid rgb(var(--bg))',
 }
 
+// Output handle — mirrors the input on the right edge, so the warehouse can also
+// tap intermediate output and feed a downstream node.
+const outHandle: CSSProperties = { ...inHandle, left: undefined, right: -5 }
+
 function WarehouseNodeImpl({ id, data, selected }: NodeProps<FtNode>) {
   const cfgName = data.config?.warehouseName
   const whName = (typeof cfgName === 'string' && cfgName.trim()) || id
@@ -143,10 +147,12 @@ function WarehouseNodeImpl({ id, data, selected }: NodeProps<FtNode>) {
         </button>
       </div>
 
-      {/* input: in */}
+      {/* ports: in (left) + out (right) */}
       <div className="relative flex h-6 items-center px-3 text-[10px] text-fg/55">
         <Handle id={handleId('in', 'in')} type="target" position={Position.Left} style={inHandle} />
         <span>in</span>
+        <span className="ml-auto text-fg/45">out</span>
+        <Handle id={handleId('out', 'out')} type="source" position={Position.Right} style={outHandle} />
       </div>
 
       {/* run pile */}

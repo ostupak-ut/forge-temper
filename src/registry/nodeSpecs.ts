@@ -382,7 +382,7 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
     color: '#0ea5e9',
     icon: Archive,
     inputs: [{ id: 'in', type: 'any', label: 'in' }],
-    outputs: [],
+    outputs: [{ id: 'out', type: 'any', label: 'out' }],
     fields: [
       {
         key: 'warehouseName',
@@ -398,12 +398,13 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
         kind: 'select',
         group: 'Warehouse',
         options: [
+          { label: 'Everything (default)', value: 'all' },
           { label: 'PDF only', value: 'pdf' },
           { label: 'Markdown only', value: 'md' },
           { label: 'LaTeX (.tex)', value: 'tex' },
-          { label: 'Everything', value: 'all' },
+          { label: 'Images only', value: 'img' },
         ],
-        help: 'Which artifact types to pile from the upstream agent each run.',
+        help: 'Collects every output file by default. Pick a type only to filter the pile down.',
       },
       { key: 'pile', label: 'Pile', kind: 'warehouse', group: 'Warehouse' },
     ],

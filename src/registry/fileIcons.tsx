@@ -78,6 +78,14 @@ function extOf(name: string): string {
   return i > 0 ? base.slice(i + 1).toLowerCase() : ''
 }
 
+/** Image extensions browsers render inline — the single source for previews/thumbnails. */
+export const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif', 'ico'] as const
+
+/** True if a file name is a previewable image. */
+export function isImage(name: string): boolean {
+  return (IMAGE_EXTS as readonly string[]).includes(extOf(name))
+}
+
 /** Resolve an icon + color for a file name (or folder). The single source of truth. */
 export function fileGlyph(name: string, isDir = false): Glyph {
   if (isDir) return FOLDER

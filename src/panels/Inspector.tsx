@@ -18,6 +18,7 @@ import { usePresets } from '@/io/customPresets'
 import type { Edge } from '@xyflow/react'
 import { useGraphStore } from '@/store/graphStore'
 import { getSpec } from '@/registry/nodeSpecs'
+import { isImage } from '@/registry/fileIcons'
 import { AGENT_ICONS, ICON_NAMES, resolveNodeIcon } from '@/registry/icons'
 import { FileGlyphIcon } from '@/registry/fileIcons'
 import type { FieldDescriptor, FieldOption } from '@/registry/types'
@@ -240,6 +241,7 @@ function NodeOutput({ protoDir }: { protoDir: string }) {
   }, [protoDir])
 
   const pdf = files.find((f) => f.name.toLowerCase().endsWith('.pdf'))
+  const images = files.filter((f) => isImage(f.name))
   const docs = files.filter((f) => f.name.endsWith('.md') || f.name.endsWith('.tex'))
   const raw = (rel: string) => `/api/fs/raw?path=${encodeURIComponent(rel)}`
 
@@ -256,6 +258,19 @@ function NodeOutput({ protoDir }: { protoDir: string }) {
       </div>
       {pdf && (
         <iframe title="paper" src={raw(pdf.rel)} className="h-72 w-full rounded border border-border/10 bg-white" />
+      )}
+      {images.length > 0 && (
+        <div className="mt-1 grid grid-cols-2 gap-1">
+          {images.map((f) => (
+            <a key={f.rel} href={raw(f.rel)} target="_blank" rel="noreferrer" title={f.name}>
+              <img
+                src={raw(f.rel)}
+                alt={f.name}
+                className="h-28 w-full rounded border border-border/10 bg-white/5 object-contain"
+              />
+            </a>
+          ))}
+        </div>
       )}
       {docs.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-1">
@@ -665,17 +680,31 @@ function WarehouseGallery({ nodeId }: { nodeId: string }) {
             {openRun === r.rel && (
               <div className="border-t border-border/10 p-1">
                 {files.length === 0 && <p className="px-1 py-1 text-[10px] text-fg/30">empty</p>}
-                {files.map((f) => (
-                  <a
-                    key={f.rel}
-                    href={raw(f.rel)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block truncate rounded px-1.5 py-0.5 text-[10px] text-sky-300/80 hover:bg-fg/5 hover:underline"
-                  >
-                    {f.name}
-                  </a>
-                ))}
+                {files.map((f) =>
+                  isImage(f.name) ? (
+                    <a
+                      key={f.rel}
+                      href={raw(f.rel)}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={f.name}
+                      className="block rounded p-0.5 hover:bg-fg/5"
+                    >
+                      <img src={raw(f.rel)} alt={f.name} className="max-h-32 w-full rounded bg-white/5 object-contain" />
+                      <span className="block truncate text-[10px] text-sky-300/70">{f.name}</span>
+                    </a>
+                  ) : (
+                    <a
+                      key={f.rel}
+                      href={raw(f.rel)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block truncate rounded px-1.5 py-0.5 text-[10px] text-sky-300/80 hover:bg-fg/5 hover:underline"
+                    >
+                      {f.name}
+                    </a>
+                  ),
+                )}
               </div>
             )}
           </div>
