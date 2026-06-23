@@ -54,7 +54,12 @@ export function resolveCodexBin(): string {
       } catch {
         continue
       }
+      // The extension ships several platform folders (e.g. linux-x86_64,
+      // windows-x86_64). Only the host-OS binary is runnable — returning a
+      // foreign one ENOENTs on spawn — so match the current platform first.
+      const platToken = process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'darwin' : 'linux'
       for (const plat of plats) {
+        if (!plat.toLowerCase().startsWith(platToken)) continue
         // Windows ships codex.exe; macOS/Linux ship a bare `codex`.
         for (const name of ['codex.exe', 'codex']) {
           const cand = path.join(binDir, plat, name)
