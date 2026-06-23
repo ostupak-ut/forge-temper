@@ -51,9 +51,9 @@ export function EditableTitle({
   }
   return (
     <button
-      className={cn('nodrag min-w-0 truncate text-left', className)}
-      onClick={start}
-      title="Click to rename"
+      className={cn('min-w-0 truncate text-left', className)}
+      onDoubleClick={start}
+      title="Double-click to rename"
     >
       {value || <span className="italic text-fg/40">{placeholder}</span>}
     </button>
@@ -103,9 +103,9 @@ export function IconColorMenu({
   return (
     <div className="relative shrink-0" ref={ref}>
       <button
-        className="nodrag -m-0.5 rounded p-0.5 hover:bg-fg/10"
-        title="Click to change icon & color"
-        onClick={(e) => {
+        className="-m-0.5 rounded p-0.5 hover:bg-fg/10"
+        title="Double-click to change icon & color"
+        onDoubleClick={(e) => {
           e.stopPropagation()
           setOpen((o) => !o)
         }}
