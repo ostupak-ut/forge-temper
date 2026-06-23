@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify'
+import { spawn } from 'node:child_process'
 import { query, type Options } from '@anthropic-ai/claude-agent-sdk'
 import { getCli, getKey } from '../persistence/settingsStore'
+import { resolveCodexBin } from '../run/codexRunner'
 
 interface ChatMsg {
   role: string
@@ -26,7 +28,8 @@ async function openrouterComplete(opts: {
       'X-Title': 'forge-temper',
     },
     body: JSON.stringify({
-      model: opts.model || 'anthropic/claude-sonnet-4.5',
+      // Default to a non-Claude model — for Claude, use the Claude Code provider.
+      model: opts.model || 'openai/gpt-4o-mini',
       messages: [{ role: 'system', content: opts.system }, ...opts.messages],
       stream: false,
     }),
@@ -71,6 +74,84 @@ async function claudeComplete(opts: {
   return text
 }
 
+/** One-shot Codex completion via `codex exec --json` (ChatGPT/Codex sub, no key). */
+async function codexComplete(opts: {
+  system: string
+  prompt: string
+  model?: string
+  signal: AbortSignal
+}): Promise<string> {
+  const bin = resolveCodexBin()
+  const args = ['exec', '--json', '--skip-git-repo-check', '--dangerously-bypass-approvals-and-sandbox']
+  if (opts.model && opts.model !== 'inherit') args.push('-m', opts.model)
+  args.push(opts.system ? `${opts.system}\n\n${opts.prompt}` : opts.prompt)
+
+  return await new Promise<string>((resolve, reject) => {
+    // stdin 'ignore' → immediate EOF so codex doesn't block reading from a pipe.
+    const child = spawn(bin, args, { cwd: process.cwd(), env: process.env, stdio: ['ignore', 'pipe', 'pipe'] })
+    let last = ''
+    let buf = ''
+    let stderr = ''
+    let failure = ''
+    const onAbort = () => {
+      try {
+        child.kill('SIGKILL')
+      } catch {
+        /* already gone */
+      }
+    }
+    if (opts.signal.aborted) onAbort()
+    else opts.signal.addEventListener('abort', onAbort)
+
+    const handle = (line: string) => {
+      const s = line.trim()
+      if (!s) return
+      let ev: Record<string, unknown>
+      try {
+        ev = JSON.parse(s)
+      } catch {
+        return // non-JSON noise
+      }
+      const type = (ev.type ?? (ev.msg as { type?: string } | undefined)?.type) as string | undefined
+      const legacy = ev.msg as Record<string, unknown> | undefined
+      const it = (ev.item ?? {}) as Record<string, unknown>
+      if ((type === 'item.completed' || type === 'item.updated') && it.type === 'agent_message' && typeof it.text === 'string') {
+        last = it.text
+      } else if (type === 'agent_message') {
+        const t = (legacy?.message ?? legacy?.text) as string | undefined
+        if (t) last = t
+      } else if (type === 'task_complete' && typeof legacy?.last_agent_message === 'string') {
+        last = legacy.last_agent_message as string
+      } else if (type === 'turn.failed') {
+        failure ||= ((ev.error as { message?: string } | undefined)?.message) ?? 'turn failed'
+      } else if (type === 'error') {
+        failure ||= (ev.message as string) ?? 'codex error'
+      }
+    }
+
+    child.stdout!.on('data', (b: Buffer) => {
+      buf += b.toString('utf8')
+      let nl: number
+      while ((nl = buf.indexOf('\n')) >= 0) {
+        handle(buf.slice(0, nl))
+        buf = buf.slice(nl + 1)
+      }
+    })
+    child.stderr!.on('data', (b: Buffer) => {
+      if (stderr.length < 4000) stderr += b.toString('utf8')
+    })
+    child.on('error', (e) =>
+      reject(new Error(`Codex CLI not runnable (${String((e as Error)?.message ?? e)}). Check Settings → CLI paths.`)),
+    )
+    child.on('close', () => {
+      if (buf.trim()) handle(buf)
+      opts.signal.removeEventListener('abort', onAbort)
+      if (last.trim()) resolve(last)
+      else reject(new Error(failure || stderr.slice(0, 300) || 'codex produced no output'))
+    })
+  })
+}
+
 export async function designRoutes(app: FastifyInstance) {
   app.post('/api/design', async (req, reply) => {
     const body = (req.body ?? {}) as { provider?: string; model?: string; system?: string; messages?: ChatMsg[] }
@@ -92,7 +173,10 @@ export async function designRoutes(app: FastifyInstance) {
         const prompt =
           messages.map((m) => `${m.role === 'assistant' ? 'Assistant' : 'User'}: ${m.content}`).join('\n\n') +
           '\n\nAssistant:'
-        text = await claudeComplete({ system, prompt, model: body.model, signal: ac.signal })
+        text =
+          body.provider === 'codex'
+            ? await codexComplete({ system, prompt, model: body.model, signal: ac.signal })
+            : await claudeComplete({ system, prompt, model: body.model, signal: ac.signal })
       }
       return { ok: true, text }
     } catch (e) {

@@ -9,26 +9,35 @@ import {
   saveDesignChat,
   saveDesignPrefs,
 } from '@/io/designHistory'
+import { fetchModels, type ModelInfo } from '@/run/providerModels'
 
 const PROVIDERS = [
   { value: 'claude-code', label: 'Claude Code (subscription)' },
+  { value: 'codex', label: 'Codex (subscription)' },
   { value: 'openrouter', label: 'OpenRouter (API key)' },
 ]
 
-const MODELS: Record<string, { value: string; label: string }[]> = {
+type ModelOpt = { value: string; label: string }
+
+// Static menus for the subscription CLIs. OpenRouter's models are fetched live
+// (with Claude models filtered out — use Claude Code for those, not OpenRouter).
+const STATIC_MODELS: Record<string, ModelOpt[]> = {
   'claude-code': [
     { value: 'inherit', label: 'Default (session)' },
     { value: 'claude-opus-4-8', label: 'Opus 4.8' },
     { value: 'claude-sonnet-4-6', label: 'Sonnet 4.6' },
     { value: 'claude-haiku-4-5', label: 'Haiku 4.5' },
   ],
-  openrouter: [
-    { value: 'anthropic/claude-sonnet-4.5', label: 'Claude Sonnet 4.5' },
-    { value: 'anthropic/claude-opus-4.8', label: 'Claude Opus 4.8' },
-    { value: 'openai/gpt-4o', label: 'GPT-4o' },
-    { value: 'google/gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+  codex: [
+    { value: 'inherit', label: 'Default (session)' },
+    { value: 'gpt-5.5', label: 'GPT-5.5' },
+    { value: 'gpt-5.4', label: 'GPT-5.4' },
+    { value: 'gpt-5.4-mini', label: 'GPT-5.4 mini' },
+    { value: 'gpt-5.3-codex-spark', label: 'Codex Spark' },
   ],
 }
+
+const firstModel = (provider: string): string => STATIC_MODELS[provider]?.[0]?.value ?? 'inherit'
 
 interface Turn extends ChatMsg {
   graph?: ParsedGraph | null
@@ -52,9 +61,16 @@ const strip = (turns: Turn[]): ChatMsg[] => turns.map((t) => ({ role: t.role, co
 export function DesignChat({ onClose, workflow }: { onClose: () => void; workflow: string | null }) {
   const setGraph = useGraphStore((s) => s.setGraph)
   const prefs = loadDesignPrefs()
-  const initProvider = prefs.provider && MODELS[prefs.provider] ? prefs.provider : 'claude-code'
+  const initProvider = prefs.provider && PROVIDERS.some((p) => p.value === prefs.provider) ? prefs.provider : 'claude-code'
+  const initModel =
+    initProvider === 'openrouter'
+      ? prefs.model || '' // resolved once the live list loads
+      : STATIC_MODELS[initProvider].some((m) => m.value === prefs.model)
+        ? prefs.model!
+        : firstModel(initProvider)
   const [provider, setProvider] = useState(initProvider)
-  const [model, setModel] = useState(prefs.model || MODELS[initProvider][0].value)
+  const [model, setModel] = useState(initModel)
+  const [orModels, setOrModels] = useState<ModelInfo[]>([])
   const [turns, setTurns] = useState<Turn[]>(() => hydrate(loadDesignChat(workflow)))
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -71,13 +87,29 @@ export function DesignChat({ onClose, workflow }: { onClose: () => void; workflo
     saveDesignPrefs({ provider, model })
   }, [provider, model])
 
+  // OpenRouter: pull the live catalog, drop Claude models (use Claude Code for
+  // those), and make sure a non-Claude model ends up selected.
+  useEffect(() => {
+    if (provider !== 'openrouter') return
+    let alive = true
+    void fetchModels('openrouter').then((ms) => {
+      if (!alive) return
+      const list = ms.filter((m) => !m.id.toLowerCase().startsWith('anthropic/'))
+      setOrModels(list)
+      setModel((cur) => (cur && list.some((m) => m.id === cur) ? cur : (list[0]?.id ?? cur)))
+    })
+    return () => {
+      alive = false
+    }
+  }, [provider])
+
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [turns, busy])
 
   const onProvider = (p: string) => {
     setProvider(p)
-    setModel(MODELS[p][0].value)
+    setModel(p === 'openrouter' ? '' : firstModel(p))
   }
 
   const newChat = () => {
@@ -147,17 +179,36 @@ export function DesignChat({ onClose, workflow }: { onClose: () => void; workflo
               </option>
             ))}
           </select>
-          <select
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            className="rounded-md border border-border/15 bg-field px-2 py-1 text-[11px] text-fg/80 outline-none"
-          >
-            {MODELS[provider].map((m) => (
-              <option key={m.value} value={m.value} className="bg-card">
-                {m.label}
-              </option>
-            ))}
-          </select>
+          {provider === 'openrouter' ? (
+            <>
+              <input
+                list="design-or-models"
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                placeholder={orModels.length ? 'pick or type a model…' : 'loading models…'}
+                className="w-44 rounded-md border border-border/15 bg-field px-2 py-1 text-[11px] text-fg/80 outline-none"
+              />
+              <datalist id="design-or-models">
+                {orModels.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name || m.id}
+                  </option>
+                ))}
+              </datalist>
+            </>
+          ) : (
+            <select
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              className="rounded-md border border-border/15 bg-field px-2 py-1 text-[11px] text-fg/80 outline-none"
+            >
+              {STATIC_MODELS[provider].map((m) => (
+                <option key={m.value} value={m.value} className="bg-card">
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          )}
           <button onClick={onClose} className="rounded p-1 text-fg/40 hover:bg-fg/10">
             <X className="size-4" />
           </button>
