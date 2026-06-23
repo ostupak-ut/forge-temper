@@ -1,4 +1,4 @@
-import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs'
+import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { getWorkspaceDir } from '../config'
 import { emitEvent } from '../run/runEvents'
@@ -8,7 +8,7 @@ import { getProvider } from '../providers/registry'
 import { runStore } from '../persistence/runStore'
 import { getGraphAware, getGraphTemplate } from '../persistence/settingsStore'
 import { verifyProtoDir } from '../verify/discParser'
-import { buildGraphContext } from './graphContext'
+import { buildGraphContext, buildWarehouseDirective } from './graphContext'
 
 /**
  * Per-node execution, extracted from the old runs.ts `mode:'single'` IIFE so the
@@ -175,7 +175,10 @@ export function effectiveWorkingDir(node: GraphNode, nodes: GraphNode[], edges: 
       return fOwn || `papers/${forge.id}`
     }
   }
-  return ''
+  // Every executed agent gets its own isolated dir. (Returning '' here used to
+  // resolve to the WORKSPACE ROOT, so a body/literature agent feeding a
+  // warehouse was told to write into — and collected from — the whole tree.)
+  return `papers/${node.id}`
 }
 
 function resolveCwd(workingDir: string): string {
@@ -200,8 +203,27 @@ function resolveCwd(workingDir: string): string {
   return dir
 }
 
+/**
+ * Wipe every executable node's DEFAULT scratch dir (papers/<id>) so each whole-graph
+ * run starts clean and intermediate files don't accumulate. Nodes with an explicit
+ * workingDir are left alone; warehouses (durable piles under warehouse/) are never touched.
+ */
+export function clearDefaultScratch(nodes: GraphNode[], edges: GraphEdge[]): void {
+  const SKIP = new Set(['idea', 'file', 'infocard', 'loopcontrol', 'warehouse'])
+  for (const n of nodes) {
+    if (SKIP.has(n.data.kind)) continue
+    if (effectiveWorkingDir(n, nodes, edges) !== `papers/${n.id}`) continue // explicit dir → leave it
+    try {
+      rmSync(path.join(getWorkspaceDir(), 'papers', n.id), { recursive: true, force: true })
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 /** Stage wired Files nodes into <cwd>/inputs/ — each referenced file/folder, recursively. */
-function stageFileInputs(node: GraphNode, nodes: GraphNode[], edges: GraphEdge[], cwd: string): void {
+function stageFileInputs(node: GraphNode, nodes: GraphNode[], edges: GraphEdge[], cwd: string): boolean {
+  let staged = false
   for (const e of edges) {
     if (e.target !== node.id) continue
     const src = nodes.find((n) => n.id === e.source)
@@ -214,11 +236,41 @@ function stageFileInputs(node: GraphNode, nodes: GraphNode[], edges: GraphEdge[]
         const dest = path.join(cwd, 'inputs', path.basename(abs))
         if (statSync(abs).isDirectory()) cpSync(abs, dest, { recursive: true })
         else copyFileSync(abs, dest)
+        staged = true
       } catch {
         /* missing/locked path — skip */
       }
     }
   }
+  return staged
+}
+
+/**
+ * Stage each upstream AGENT's output files into <cwd>/inputs/<sourceLabel>/, so a
+ * downstream agent reads the real artifacts — not just the upstream's reply text.
+ * (Files nodes are handled by stageFileInputs; data nodes + warehouses are text-only.)
+ */
+function stageAgentOutputs(node: GraphNode, nodes: GraphNode[], edges: GraphEdge[], cwd: string): boolean {
+  let staged = false
+  for (const e of edges) {
+    if (e.target !== node.id || e.type === 'feedback' || e.data?.loopBackEdge) continue
+    const src = nodes.find((n) => n.id === e.source)
+    if (!src || DATA_KINDS.has(src.data.kind) || src.data.kind === 'warehouse') continue
+    const srcCwd = resolveCwd(effectiveWorkingDir(src, nodes, edges))
+    if (srcCwd === cwd) continue // shared working dir (e.g. a loop body) — nothing to copy
+    const label = String(src.data.label || src.data.kind).replace(/[^\w.\- ]/g, '_')
+    for (const rel of collectableFiles(srcCwd)) {
+      try {
+        const dest = path.join(cwd, 'inputs', label, rel.split('/').join(path.sep))
+        mkdirSync(path.dirname(dest), { recursive: true })
+        copyFileSync(path.join(srcCwd, rel), dest)
+        staged = true
+      } catch {
+        /* skip locked/missing */
+      }
+    }
+  }
+  return staged
 }
 
 /**
@@ -241,7 +293,21 @@ export async function runOneNode(
   const cfg = node.data.config ?? {}
   const cwd = resolveCwd(effectiveWorkingDir(node, nodes, edges))
 
-  stageFileInputs(node, nodes, edges, cwd)
+  // Does this agent feed a Warehouse? If so it MUST write real files into `cwd`
+  // (the warehouse collects from disk). This is FUNCTIONAL — delivered below
+  // regardless of the self-awareness toggle, with a disk backstop after the run.
+  const feedsWarehouse = edges.some(
+    (e) =>
+      e.source === node.id &&
+      e.type !== 'feedback' &&
+      !e.data?.loopBackEdge &&
+      nodes.find((n) => n.id === e.target)?.data.kind === 'warehouse',
+  )
+  const outputFile = `${String(node.data.label || node.data.kind).replace(/[^\w.\- ]/g, '_')}-output.md`
+
+  const stagedFiles = stageFileInputs(node, nodes, edges, cwd)
+  const stagedAgents = stageAgentOutputs(node, nodes, edges, cwd)
+  const stagedInputs = stagedFiles || stagedAgents
 
   const promptTemplate = String(cfg.prompt ?? '')
   const { ctx: srcCtx, keys: inputKeys } = resolveSourceInputs(node, nodes, edges, opts.results ?? {})
@@ -295,6 +361,15 @@ export async function runOneNode(
     }
   }
 
+  // The most-attended channel for weak models is the prompt itself — put the
+  // load-bearing "write a file" pointer here too, not only in the system append.
+  if (feedsWarehouse) {
+    prompt += `\n\n---\nWhen you finish, WRITE your output as a real file in ${cwd} (e.g. ${outputFile}). Your chat reply is NOT collected — only files saved in that folder are.`
+  }
+  if (stagedInputs && provider.kind === 'agent') {
+    prompt += `\n\nFiles from upstream steps are staged in your \`inputs/\` folder — read what you need from there.`
+  }
+
   // Make the node self-aware: prepend an auto-generated map of where it sits in
   // the pipeline to its system prompt, then the user's own system append.
   const userAppend = typeof cfg.systemAppend === 'string' && cfg.systemAppend ? cfg.systemAppend : ''
@@ -310,7 +385,12 @@ export async function runOneNode(
   const verifierDirective = isVerifier
     ? `## Loop verifier role\nYou are this loop's VERIFIER. Judge whether the work so far meets the PASS CONDITION. Reason briefly, then output EXACTLY one final line — \`VERDICT: PASS\` or \`VERDICT: FAIL\` — with nothing after it.\nPASS CONDITION: ${passCondition || '(not specified — judge whether the latest input is correct and complete)'}`
     : ''
-  const systemAppend = [graphContext, userAppend, verifierDirective].filter(Boolean).join('\n\n---\n\n')
+  // The warehouse directive is FUNCTIONAL (not optional context) → built
+  // unconditionally and placed FIRST, so it precedes the custom template + map.
+  const warehouseDirective = feedsWarehouse ? buildWarehouseDirective(cwd, outputFile) : ''
+  const systemAppend = [warehouseDirective, graphContext, userAppend, verifierDirective]
+    .filter(Boolean)
+    .join('\n\n---\n\n')
 
   const runResult = await provider.run({
     runId,
@@ -372,6 +452,17 @@ export async function runOneNode(
     }
   }
 
+  // Backstop: an agent that feeds a warehouse but wrote NO collectable file
+  // (weak models often only reply in text) — materialize its reply to disk so
+  // the warehouse never silently collects nothing.
+  if (runResult.ok && feedsWarehouse && runResult.result && !hasCollectableOutput(cwd)) {
+    try {
+      writeFileSync(path.join(cwd, outputFile), runResult.result)
+    } catch {
+      /* best-effort — disk full / locked */
+    }
+  }
+
   return { ok: runResult.ok, result: runResult.result, sessionId: runResult.sessionId, verdict }
 }
 
@@ -388,6 +479,38 @@ const EXT_FILTER: Record<string, string[] | null> = {
 }
 /** LaTeX build junk never worth piling, even under "Everything". */
 const JUNK_EXT = new Set(['.aux', '.fls', '.fdb_latexmk', '.log', '.out', '.toc', '.synctex'])
+
+/** Relative paths of real output files under `dir` (skip inputs/deps/vcs/junk/skill). */
+function collectableFiles(dir: string): string[] {
+  const out: string[] = []
+  const walk = (d: string, rel: string): void => {
+    let ents
+    try {
+      ents = readdirSync(d, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const ent of ents) {
+      if (ent.name === 'inputs' || ent.name === 'node_modules' || ent.name === '.git') continue
+      const child = rel ? `${rel}/${ent.name}` : ent.name
+      if (ent.isDirectory()) {
+        walk(path.join(d, ent.name), child)
+        continue
+      }
+      if (ent.name.startsWith('.skill-')) continue
+      const lower = ent.name.toLowerCase()
+      if (lower.endsWith('.synctex.gz') || JUNK_EXT.has(path.extname(lower))) continue
+      out.push(child)
+    }
+  }
+  walk(dir, '')
+  return out
+}
+
+/** Did an agent leave ANY real output file under `dir`? */
+function hasCollectableOutput(dir: string): boolean {
+  return collectableFiles(dir).length > 0
+}
 
 async function archiveWarehouse(
   node: GraphNode,

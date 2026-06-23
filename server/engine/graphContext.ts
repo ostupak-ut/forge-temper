@@ -29,6 +29,31 @@ export const DEFAULT_GRAPH_TEMPLATE = `## Your place in the pipeline
 
 Act so your output is exactly what the downstream steps need, and stay consistent with what the upstream steps produced. Do only YOUR step — the others handle theirs.`
 
+/**
+ * The (functional, not optional) directive telling an agent that a downstream
+ * Warehouse collects its output by reading FILES from disk — so it must write a
+ * real file, not just reply. Built in runOneNode and delivered regardless of the
+ * self-awareness toggle, placed first in the system prompt and echoed into the
+ * user prompt (weak models attend the prompt channel more).
+ */
+export function buildWarehouseDirective(cwd: string, suggestedFile: string): string {
+  return [
+    '=== OUTPUT REQUIRED (read first) ===',
+    'A Warehouse step downstream collects your output by reading FILES from disk. It does NOT read your chat reply. If you only describe your result in text, NOTHING is collected and your work is lost.',
+    '',
+    'You MUST write your result as a REAL FILE inside this exact folder (it already exists):',
+    `  ${cwd}`,
+    '',
+    `- Write at least one file there before you finish. Suggested name if you have nothing better: ${suggestedFile}`,
+    '- Actually create the file (your Write tool, or a Bash redirect/compile) — do not just print its contents.',
+    '- Put it directly in that folder. Do NOT use another directory, and do NOT use an inputs/ subfolder (that one is ignored).',
+    '- Collected types include .md, .tex, .pdf, .png and most others; LaTeX build junk (.aux/.log/…) is ignored.',
+    '',
+    'After writing, you may briefly summarize in your reply, but the FILE is the deliverable.',
+    '====================================',
+  ].join('\n')
+}
+
 const isFeedback = (e: GraphEdge): boolean => e.type === 'feedback' || Boolean(e.data?.loopBackEdge)
 
 const firstLine = (s: string, max: number): string => {
@@ -116,12 +141,10 @@ export function buildGraphContext(
   opts: { enabled?: boolean; template?: string; cwd?: string } = {},
 ): string {
   if (opts.enabled === false) return ''
-  const { map, feedsWarehouse } = buildGraphMap(node, nodes, edges)
+  // The warehouse "write to disk" directive is FUNCTIONAL and lives in
+  // runOneNode (buildWarehouseDirective) so it survives this toggle; here we
+  // only render the structural self-awareness map.
+  const { map } = buildGraphMap(node, nodes, edges)
   const tpl = opts.template && opts.template.trim() ? opts.template : DEFAULT_GRAPH_TEMPLATE
-  let out = tpl.includes('{{graph}}') ? tpl.replace('{{graph}}', map) : `${tpl}\n\n${map}`
-  if (feedsWarehouse) {
-    const where = opts.cwd ? `this exact folder: ${opts.cwd}` : 'your current working directory'
-    out += `\n\nIMPORTANT — a Warehouse downstream COLLECTS your results from disk. Write your output artifact(s) as REAL FILES inside ${where} (e.g. actually write/compile the .pdf, .md, or .tex; anything under that folder is collected EXCEPT an inputs/ subfolder). Do NOT save them anywhere else, and do NOT merely describe them in your reply — otherwise nothing is collected.`
-  }
-  return out
+  return tpl.includes('{{graph}}') ? tpl.replace('{{graph}}', map) : `${tpl}\n\n${map}`
 }

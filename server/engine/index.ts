@@ -1,8 +1,9 @@
 import { compileGraph } from './compile'
 import { schedule, type ScheduleOpts } from './scheduler'
+import { clearDefaultScratch } from './runOneNode'
 import type { GraphEdge, GraphNode } from './runOneNode'
 
-export { runOneNode, allowedToolsFor, effectiveWorkingDir } from './runOneNode'
+export { runOneNode, allowedToolsFor, effectiveWorkingDir, clearDefaultScratch } from './runOneNode'
 export type { GraphNode, GraphEdge, RunOneResult, NodeVerdict } from './runOneNode'
 export { compileGraph } from './compile'
 export type { CompiledGraph, LoopPlan, Super } from './compile'
@@ -27,6 +28,7 @@ export async function runGraph(
 ): Promise<void> {
   const nodes = graph.nodes ?? []
   const edges = graph.edges ?? []
+  clearDefaultScratch(nodes, edges) // fresh scratch each whole-graph run; warehouse piles untouched
   const compiled = compileGraph(nodes, edges)
   await schedule(compiled, nodes, edges, runId, signal, opts)
 }
