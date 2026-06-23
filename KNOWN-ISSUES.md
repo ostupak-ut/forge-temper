@@ -95,4 +95,34 @@ nodes' `inputs/`**. Then:
 
 ---
 
-_Last updated from the 2026-06-21 session._
+## 4. No parallel sessions — single user, single workspace, one active run (design boundary)
+
+**Symptom / question.** Can't run two workflows on two folders at once; two
+browser tabs interfere; starting a second run hijacks the first.
+
+**Root cause.** The app is single-session-local by design:
+- The **workspace root is one server-wide global** (`config.ts` `setWorkspaceDir`
+  sets a single `workspaceOverride`). Open Folder changes it for the whole server,
+  so there's no per-session workspace.
+- Tabs share one backend, one `workspace/`, one `.forge-temper/runs.db`, one
+  `warehouse/`, and the same-origin `localStorage` autosave → tabs stomp on each
+  other.
+- The client tracks a **single `currentRunId`**; a second run resets the view to
+  it and does NOT stop the first server-side. Concurrent whole-graph runs also
+  share scratch dirs (`papers/<id>`) and the warehouse, so they collide.
+
+**What DOES work.** Parallelism **within one run** — independent same-stage nodes
+run concurrently (the `N×` cap) behind a per-working-dir lock. That's intended.
+
+**Recover right now.** Run one workflow / one folder / one run at a time. For
+breadth inside a single run, use Parallel mode + the concurrency control.
+
+**Permanent fix (parked — a real chunk, not a flag).** Make the workspace
+**per-session/per-run** instead of one global; isolate scratch + warehouse per
+session; give the client a **run registry** instead of a single `currentRunId`;
+key autosave per-tab. Changes the core single-user model, so only if multi-session
+becomes a real need.
+
+---
+
+_Last updated from the 2026-06-23 session._
