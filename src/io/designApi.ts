@@ -60,7 +60,8 @@ export function buildSystemPrompt(context?: string): string {
       ? [
           'CONTEXT — build AROUND what already exists; do NOT ignore it:',
           context.trim(),
-          'If the user has files or a partial graph already, incorporate them: add File nodes whose paths point to the existing files and wire them into the agents that need them, and keep/extend useful existing nodes. Design the workflow to actually USE what is there.',
+          'If the user has files or a partial graph already, incorporate them: add File nodes whose paths point to the existing files and wire them into the agents that need them.',
+          'EDITING an existing graph: REUSE the exact node id shown (id=…) for every node you keep or modify — only invent new ids for genuinely NEW nodes. When the user asks to edit/extend (not start over), return the COMPLETE resulting graph (all kept nodes with their ids + the changes); the user can Replace or Merge. Never silently drop existing nodes.',
           '',
         ]
       : []),

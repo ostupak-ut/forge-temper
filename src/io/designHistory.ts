@@ -25,15 +25,33 @@ export function loadDesignChat(flowName: string | null): ChatMsg[] {
   return Array.isArray(msgs) ? msgs : []
 }
 
-export function saveDesignChat(flowName: string | null, msgs: ChatMsg[]): void {
-  const all = readAll()
-  if (msgs.length) all[workflowKey(flowName)] = msgs
-  else delete all[workflowKey(flowName)]
+const trySet = (store: ChatStore): boolean => {
   try {
-    localStorage.setItem(CHATS_KEY, JSON.stringify(all))
+    localStorage.setItem(CHATS_KEY, JSON.stringify(store))
+    return true
   } catch {
-    /* quota — ignore */
+    return false
   }
+}
+
+export function saveDesignChat(flowName: string | null, msgs: ChatMsg[]): void {
+  const key = workflowKey(flowName)
+  const all = readAll()
+  if (msgs.length) all[key] = msgs
+  else delete all[key]
+  if (trySet(all)) return
+
+  // Over quota (chat content includes big graph JSON). Prune progressively so
+  // saving KEEPS WORKING instead of silently failing: halve this workflow's
+  // history, then drop other workflows, then keep just the last turns.
+  let cur = msgs
+  while (cur.length > 1) {
+    cur = cur.slice(-Math.max(1, Math.floor(cur.length / 2)))
+    all[key] = cur
+    if (trySet(all)) return
+  }
+  if (trySet({ [key]: msgs.slice(-6) })) return
+  trySet({ [key]: msgs.slice(-1) })
 }
 
 export function clearDesignChat(flowName: string | null): void {

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, MessageSquarePlus, Send, Sparkles, Wand2, X } from 'lucide-react'
-import { useGraphStore } from '@/store/graphStore'
+import { Check, GitMerge, MessageSquarePlus, Send, Sparkles, Wand2, X } from 'lucide-react'
+import type { Edge } from '@xyflow/react'
+import { useGraphStore, type FtNode } from '@/store/graphStore'
 import { parseGraph, requestDesign, type ChatMsg, type ParsedGraph } from '@/io/designApi'
 import {
   clearDesignChat,
@@ -68,7 +69,7 @@ async function gatherContext(): Promise<string> {
       const cfg = n.data.config as Record<string, unknown>
       const paths = Array.isArray(cfg?.paths) ? (cfg.paths as unknown[]).map(String) : []
       const extra = n.data.kind === 'file' && paths.length ? ` → ${paths.join(', ')}` : ''
-      return `  - "${n.data.label}" (${n.data.kind})${extra}`
+      return `  - id=${n.id} "${n.data.label}" (${n.data.kind})${extra}`
     })
     parts.push(`Current canvas (${nodes.length} node${nodes.length === 1 ? '' : 's'}):\n${lines.join('\n')}`)
   }
@@ -192,10 +193,37 @@ export function DesignChat({ onClose, workflow }: { onClose: () => void; workflo
     }
   }
 
-  const apply = (g: ParsedGraph) => {
-    setGraph(g.nodes, g.edges)
+  const flash = () => {
     setAppliedAt(Date.now())
     setTimeout(() => setAppliedAt(null), 1800)
+  }
+
+  // Replace the whole canvas with the generated graph.
+  const apply = (g: ParsedGraph) => {
+    setGraph(g.nodes, g.edges)
+    flash()
+  }
+
+  // Merge into the canvas: update nodes whose id matches (keep their position),
+  // add new nodes (offset right so they don't overlap), keep everything else,
+  // and add only edges that aren't already there. Edits never delete the rest.
+  const merge = (g: ParsedGraph) => {
+    const st = useGraphStore.getState()
+    const upd = new Map(g.nodes.map((n) => [n.id, n]))
+    const curIds = new Set(st.nodes.map((n) => n.id))
+    const offsetX = st.nodes.length ? Math.max(...st.nodes.map((n) => n.position.x)) + 360 : 0
+    const nodes: FtNode[] = st.nodes.map((n) => {
+      const u = upd.get(n.id)
+      return u ? { ...n, type: u.type, data: u.data } : n // keep position, take new data/type
+    })
+    for (const u of g.nodes) {
+      if (!curIds.has(u.id)) nodes.push({ ...u, position: { x: u.position.x + offsetX, y: u.position.y } })
+    }
+    const key = (e: Edge) => `${e.source}|${e.target}|${e.sourceHandle ?? ''}|${e.targetHandle ?? ''}`
+    const have = new Set(st.edges.map(key))
+    const edges: Edge[] = [...st.edges, ...g.edges.filter((e) => !have.has(key(e)))]
+    setGraph(nodes, edges)
+    flash()
   }
 
   return (
@@ -284,13 +312,24 @@ export function DesignChat({ onClose, workflow }: { onClose: () => void; workflo
               >
                 <p className="whitespace-pre-wrap">{t.role === 'assistant' ? t.display : t.content}</p>
                 {t.role === 'assistant' && t.graph && (
-                  <button
-                    onClick={() => apply(t.graph!)}
-                    className="mt-2 flex items-center gap-1.5 rounded-md bg-emerald-500/20 px-2.5 py-1 text-[11px] font-medium text-emerald-300 hover:bg-emerald-500/30"
-                  >
-                    <Check className="size-3.5" />
-                    Apply to canvas · {t.graph.nodeCount} nodes, {t.graph.edgeCount} edges
-                  </button>
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    <button
+                      onClick={() => apply(t.graph!)}
+                      title="Replace the whole canvas with this graph"
+                      className="flex items-center gap-1.5 rounded-md bg-emerald-500/20 px-2.5 py-1 text-[11px] font-medium text-emerald-300 hover:bg-emerald-500/30"
+                    >
+                      <Check className="size-3.5" />
+                      Replace canvas · {t.graph.nodeCount}n {t.graph.edgeCount}e
+                    </button>
+                    <button
+                      onClick={() => merge(t.graph!)}
+                      title="Merge into the current canvas: update matching nodes, add new ones, keep the rest"
+                      className="flex items-center gap-1.5 rounded-md bg-sky-500/20 px-2.5 py-1 text-[11px] font-medium text-sky-300 hover:bg-sky-500/30"
+                    >
+                      <GitMerge className="size-3.5" />
+                      Merge into canvas
+                    </button>
+                  </div>
                 )}
                 {t.role === 'assistant' && !t.graph && (
                   <p className="mt-1 text-[10px] text-amber-400/80">No valid graph found in the reply — try rephrasing.</p>
