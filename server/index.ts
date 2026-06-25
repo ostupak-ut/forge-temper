@@ -64,6 +64,8 @@ app.get('/api/health', async () => {
       'anthropic-harness': keys.anthropic,
       'openrouter-agent': keys.openrouter,
       openrouter: keys.openrouter,
+      'openrouter-image': keys.openrouter,
+      'openrouter-video': keys.openrouter,
     },
   }
 })

@@ -4,6 +4,7 @@ import {
   FileCode2,
   FileJson,
   FileImage,
+  FileVideo,
   FileSpreadsheet,
   FileArchive,
   FileType,
@@ -64,6 +65,14 @@ const BY_EXT: Record<string, Glyph> = {
   webp: { Icon: FileImage, color: '#c084fc' },
   bmp: { Icon: FileImage, color: '#c084fc' },
   svg: { Icon: FileImage, color: '#f0abfc' },
+  avif: { Icon: FileImage, color: '#c084fc' },
+  // video
+  mp4: { Icon: FileVideo, color: '#fb7185' },
+  webm: { Icon: FileVideo, color: '#fb7185' },
+  mov: { Icon: FileVideo, color: '#fb7185' },
+  m4v: { Icon: FileVideo, color: '#fb7185' },
+  mkv: { Icon: FileVideo, color: '#fb7185' },
+  avi: { Icon: FileVideo, color: '#fb7185' },
   // archives
   zip: { Icon: FileArchive, color: '#a8a29e' },
   tar: { Icon: FileArchive, color: '#a8a29e' },
@@ -84,6 +93,14 @@ export const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'a
 /** True if a file name is a previewable image. */
 export function isImage(name: string): boolean {
   return (IMAGE_EXTS as readonly string[]).includes(extOf(name))
+}
+
+/** Video extensions browsers play inline via <video> — the single source for previews. */
+export const VIDEO_EXTS = ['mp4', 'webm', 'mov', 'm4v', 'mkv', 'ogv'] as const
+
+/** True if a file name is a previewable video. */
+export function isVideo(name: string): boolean {
+  return (VIDEO_EXTS as readonly string[]).includes(extOf(name))
 }
 
 /** Resolve an icon + color for a file name (or folder). The single source of truth. */

@@ -18,6 +18,8 @@ const PROVIDER_OPTIONS = [
   { label: 'Anthropic Harness — API key, no CLI', value: 'anthropic-harness' },
   { label: 'OpenRouter — agent (tool-capable models)', value: 'openrouter-agent' },
   { label: 'OpenRouter — chat (no tools/skills)', value: 'openrouter' },
+  { label: 'OpenRouter — image (generation)', value: 'openrouter-image' },
+  { label: 'OpenRouter — video (generation)', value: 'openrouter-video' },
 ]
 
 const MODEL_OPTIONS = [
@@ -413,6 +415,7 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
           { label: 'Markdown only', value: 'md' },
           { label: 'LaTeX (.tex)', value: 'tex' },
           { label: 'Images only', value: 'img' },
+          { label: 'Video only', value: 'vid' },
         ],
         help: 'Collects every output file by default. Pick a type only to filter the pile down.',
       },

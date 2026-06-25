@@ -72,42 +72,87 @@ export async function settingsRoutes(app: FastifyInstance) {
     }
   })
 
-  // Server-side proxy for OpenRouter's model list (public endpoint; key optional).
-  // Both the chat ('openrouter') and agent ('openrouter-agent') providers use it;
-  // the agent variant lists only TOOL-CAPABLE models (it drives a tool-use loop).
-  type ORModel = { id: string; name: string; prompt?: string; completion?: string; tools: boolean }
+  // Server-side proxy for OpenRouter's model lists (public endpoints; key optional).
+  // Four categories share this route:
+  //   openrouter        → chat/text models (image/video generators excluded — own categories)
+  //   openrouter-agent  → TOOL-CAPABLE models only (drives a tool-use loop)
+  //   openrouter-image  → image-output models (synchronous generation via chat completions)
+  //   openrouter-video  → video models from the SEPARATE async /videos job API endpoint
+  type ORModel = { id: string; name: string; prompt?: string; completion?: string; tools: boolean; output: string[] }
   let cache: { ts: number; models: ORModel[] } | null = null
+  let vcache: { ts: number; models: ORModel[] } | null = null
+  const DAY = 24 * 3600 * 1000
+  const orHeaders = (): Record<string, string> => {
+    const headers: Record<string, string> = {}
+    const key = getKey('openrouter')
+    if (key) headers.Authorization = `Bearer ${key}`
+    return headers
+  }
+
+  // Chat/agent/image all derive from the standard /models list (cached together).
+  async function loadChatModels(): Promise<ORModel[]> {
+    if (cache && Date.now() - cache.ts < DAY) return cache.models
+    const res = await fetch('https://openrouter.ai/api/v1/models', { headers: orHeaders() })
+    const j = (await res.json()) as {
+      data?: Array<{
+        id: string
+        name?: string
+        pricing?: { prompt?: string; completion?: string }
+        supported_parameters?: string[]
+        architecture?: { output_modalities?: string[] }
+      }>
+    }
+    const models: ORModel[] = (j.data ?? []).map((m) => ({
+      id: m.id,
+      name: m.name ?? m.id,
+      prompt: m.pricing?.prompt,
+      completion: m.pricing?.completion,
+      tools: (m.supported_parameters ?? []).includes('tools'),
+      output: m.architecture?.output_modalities ?? [],
+    }))
+    cache = { ts: Date.now(), models }
+    return models
+  }
+
+  // Video models live under a different namespace (the async job API), so they
+  // need their own fetch + cache — they never appear in /api/v1/models.
+  async function loadVideoModels(): Promise<ORModel[]> {
+    if (vcache && Date.now() - vcache.ts < DAY) return vcache.models
+    const res = await fetch('https://openrouter.ai/api/v1/videos/models', { headers: orHeaders() })
+    const j = (await res.json()) as {
+      data?: Array<{ id: string; name?: string }>
+      models?: Array<{ id: string; name?: string }>
+    }
+    const list = j.data ?? j.models ?? []
+    const models: ORModel[] = list.map((m) => ({ id: m.id, name: m.name ?? m.id, tools: false, output: ['video'] }))
+    vcache = { ts: Date.now(), models }
+    return models
+  }
+
+  const isImageModel = (m: ORModel) => m.output.includes('image')
+  const isVideoModel = (m: ORModel) => m.output.includes('video')
+
   app.get('/api/providers/:id/models', async (req) => {
     const { id } = req.params as { id: string }
-    if (id !== 'openrouter' && id !== 'openrouter-agent') return { models: [] }
-    const toolsOnly = id === 'openrouter-agent'
-    const now = Date.now()
-    if (!cache || now - cache.ts >= 24 * 3600 * 1000) {
-      try {
-        const headers: Record<string, string> = {}
-        const key = getKey('openrouter')
-        if (key) headers.Authorization = `Bearer ${key}`
-        const res = await fetch('https://openrouter.ai/api/v1/models', { headers })
-        const j = (await res.json()) as {
-          data?: Array<{
-            id: string
-            name?: string
-            pricing?: { prompt?: string; completion?: string }
-            supported_parameters?: string[]
-          }>
-        }
-        const models: ORModel[] = (j.data ?? []).map((m) => ({
-          id: m.id,
-          name: m.name ?? m.id,
-          prompt: m.pricing?.prompt,
-          completion: m.pricing?.completion,
-          tools: (m.supported_parameters ?? []).includes('tools'),
-        }))
-        cache = { ts: now, models }
-      } catch (e) {
-        return { models: (cache?.models ?? []).filter((m) => !toolsOnly || m.tools), error: String(e) }
+    try {
+      if (id === 'openrouter-video') return { models: await loadVideoModels() }
+      if (id === 'openrouter' || id === 'openrouter-agent' || id === 'openrouter-image') {
+        const all = await loadChatModels()
+        if (id === 'openrouter-agent') return { models: all.filter((m) => m.tools) }
+        if (id === 'openrouter-image') return { models: all.filter(isImageModel) }
+        // plain chat: text models, excluding image/video generators (own categories)
+        return { models: all.filter((m) => !isImageModel(m) && !isVideoModel(m)) }
       }
+      return { models: [] }
+    } catch (e) {
+      // On a fetch failure, serve a stale cache scoped to the requested category.
+      if (id === 'openrouter-video') return { models: vcache?.models ?? [], error: String(e) }
+      const all = cache?.models ?? []
+      if (id === 'openrouter-agent') return { models: all.filter((m) => m.tools), error: String(e) }
+      if (id === 'openrouter-image') return { models: all.filter(isImageModel), error: String(e) }
+      if (id === 'openrouter')
+        return { models: all.filter((m) => !isImageModel(m) && !isVideoModel(m)), error: String(e) }
+      return { models: [], error: String(e) }
     }
-    return { models: cache.models.filter((m) => !toolsOnly || m.tools) }
   })
 }

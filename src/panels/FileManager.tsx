@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronRight, ExternalLink, FolderPlus, RefreshCw, Trash2, Upload, X } from 'lucide-react'
-import { FileGlyphIcon, isImage } from '@/registry/fileIcons'
+import { FileGlyphIcon, isImage, isVideo } from '@/registry/fileIcons'
 import { collectDropFiles, hasOsFiles, uploadDropFiles } from '@/io/fileDrop'
 import { revealInOS } from '@/io/reveal'
 
@@ -214,6 +214,13 @@ export function FileManager({ onClose, refreshKey }: { onClose: () => void; refr
           )}
           {preview && isImage(preview.rel) && (
             <img src={`/api/fs/raw?path=${encodeURIComponent(preview.rel)}`} alt={preview.rel} className="max-w-full" />
+          )}
+          {preview && isVideo(preview.rel) && (
+            <video
+              src={`/api/fs/raw?path=${encodeURIComponent(preview.rel)}`}
+              controls
+              className="max-w-full"
+            />
           )}
           {preview && TEXT_EXT.includes(preview.ext) && (
             <pre className="whitespace-pre-wrap p-3 font-mono text-[11px] leading-snug text-fg/70">{text}</pre>

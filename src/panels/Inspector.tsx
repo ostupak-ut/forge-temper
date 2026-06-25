@@ -160,7 +160,7 @@ function ModelField({
   // Only OpenRouter takes arbitrary model ids — keep an off-list value selectable
   // there. For Claude/Codex/harness a foreign model (e.g. a Grok id left over from
   // OpenRouter) is invalid, so the list falls back to "inherit".
-  const freeform = provider === 'openrouter' || provider === 'openrouter-agent'
+  const freeform = provider.startsWith('openrouter')
   if (cur !== 'inherit' && freeform && !opts.some((o) => o.value === cur)) {
     opts = [...opts, { value: cur, label: `${cur} (custom)` }]
   }

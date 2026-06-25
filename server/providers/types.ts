@@ -28,13 +28,14 @@ export interface ProviderRunResult {
 
 /**
  * A model/agent backend. `agent` providers run an agentic loop with tools and
- * can load Claude Code skills; `chat` providers are single-shot text models.
- * Each provider emits SSE events itself (via emitEvent(runId, …)).
+ * can load Claude Code skills; `chat` providers are single-shot text models;
+ * `image`/`video` providers generate media files and write them to the working
+ * dir. Each provider emits SSE events itself (via emitEvent(runId, …)).
  */
 export interface Provider {
   id: string
   label: string
-  kind: 'agent' | 'chat'
+  kind: 'agent' | 'chat' | 'image' | 'video'
   supportsSkills: boolean
   run(params: ProviderRunParams): Promise<ProviderRunResult>
 }

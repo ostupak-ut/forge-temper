@@ -329,6 +329,10 @@ export async function runOneNode(
   if (fb && !refd('feedback') && !refd('temper_report')) extras.push(`### feedback (previous verdict)\n${fb}`)
   if (extras.length) prompt += `\n\n## Additional inputs\n\n${extras.join('\n\n')}`
   const provider = getProvider(typeof cfg.provider === 'string' ? cfg.provider : undefined)
+  // Media providers generate an image/video and save the FILE themselves, so the
+  // prompt is the generation description — keep it clean (no "write a file" /
+  // skill / staged-inputs scaffolding meant for text agents).
+  const isMedia = provider.kind === 'image' || provider.kind === 'video'
 
   // forge/temper do real agentic work (write files, run sympy/latexmk),
   // so they need an agentic provider. Prose/other nodes run on any provider.
@@ -363,7 +367,7 @@ export async function runOneNode(
 
   // The most-attended channel for weak models is the prompt itself — put the
   // load-bearing "write a file" pointer here too, not only in the system append.
-  if (feedsWarehouse) {
+  if (feedsWarehouse && !isMedia) {
     prompt += `\n\n---\nWhen you finish, WRITE your output as a real file in ${cwd} (e.g. ${outputFile}). Your chat reply is NOT collected — only files saved in that folder are.`
   }
   if (stagedInputs && provider.kind === 'agent') {
@@ -475,6 +479,7 @@ const EXT_FILTER: Record<string, string[] | null> = {
   md: ['.md'],
   tex: ['.tex'],
   img: ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg', '.avif'],
+  vid: ['.mp4', '.webm', '.mov', '.m4v', '.mkv', '.avi'],
   all: null,
 }
 /** LaTeX build junk never worth piling, even under "Everything". */
