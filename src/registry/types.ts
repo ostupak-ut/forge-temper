@@ -12,6 +12,7 @@ export type NodeKind =
   | 'body'
   | 'literature'
   | 'assemble'
+  | 'glue'
   | 'warehouse'
 
 /** A typed input/output port on a node. */

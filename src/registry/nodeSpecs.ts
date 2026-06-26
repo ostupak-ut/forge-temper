@@ -9,6 +9,7 @@ import {
   StickyNote,
   Sparkles,
   Archive,
+  Clapperboard,
 } from 'lucide-react'
 import type { FieldDescriptor, NodeKind, NodeSpec } from './types'
 
@@ -423,6 +424,46 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
     ],
     defaultConfig: { collect: 'all', warehouseName: '' },
     reactFlowType: 'ftWarehouse',
+  },
+  glue: {
+    kind: 'glue',
+    label: 'Glue',
+    description:
+      'Deterministically stitch photos + videos into ONE mp4 with ffmpeg (no AI, no tokens). Wire photo/video sources into "media"; stills become short segments. Clip order = file name — prefix 01_/02_ to control it.',
+    color: '#14b8a6',
+    icon: Clapperboard,
+    inputs: [{ id: 'media', type: 'any', label: 'photos / videos' }],
+    outputs: [{ id: 'out', type: 'file', label: 'glued.mp4' }],
+    fields: [
+      { key: 'outputName', label: 'Output file', kind: 'text', group: 'Output', placeholder: 'glued.mp4' },
+      {
+        key: 'width',
+        label: 'Width',
+        kind: 'number',
+        group: 'Format',
+        min: 0,
+        help: '0 = match the first video clip (falls back to 1080).',
+      },
+      {
+        key: 'height',
+        label: 'Height',
+        kind: 'number',
+        group: 'Format',
+        min: 0,
+        help: '0 = match the first video clip (falls back to 1920).',
+      },
+      { key: 'fps', label: 'FPS', kind: 'number', group: 'Format', min: 1 },
+      {
+        key: 'imageDuration',
+        label: 'Photo seconds',
+        kind: 'number',
+        group: 'Format',
+        min: 1,
+        help: 'How many seconds each still photo is shown.',
+      },
+    ],
+    defaultConfig: { outputName: 'glued.mp4', width: 0, height: 0, fps: 30, imageDuration: 3 },
+    reactFlowType: 'ftNode',
   },
 }
 

@@ -5,6 +5,7 @@ import { emitEvent } from '../run/runEvents'
 import { resolvePrompt } from '../run/resolvePrompt'
 import { loadSkillText } from '../skills/skillLoader'
 import { getProvider } from '../providers/registry'
+import { runGlue } from '../run/glueRunner'
 import { runStore } from '../persistence/runStore'
 import { getGraphAware, getGraphTemplate } from '../persistence/settingsStore'
 import { verifyProtoDir } from '../verify/discParser'
@@ -162,6 +163,7 @@ export function effectiveWorkingDir(node: GraphNode, nodes: GraphNode[], edges: 
   if (own) return own
   if (node.data.kind === 'forge') return `papers/${node.id}`
   if (node.data.kind === 'custom') return `papers/${node.id}`
+  if (node.data.kind === 'glue') return `papers/${node.id}`
   if (node.data.kind === 'assemble') return `papers/${node.id}`
   if (node.data.kind === 'temper') {
     // Find the upstream FORGE among ALL incoming edges (not just the first one,
@@ -308,6 +310,10 @@ export async function runOneNode(
   const stagedFiles = stageFileInputs(node, nodes, edges, cwd)
   const stagedAgents = stageAgentOutputs(node, nodes, edges, cwd)
   const stagedInputs = stagedFiles || stagedAgents
+
+  // The Glue node deterministically stitches its staged media via ffmpeg (no
+  // LLM/provider). Runs AFTER staging so inputs/ holds the photos/videos.
+  if (node.data.kind === 'glue') return runGlue(node, cwd, runId, signal)
 
   const promptTemplate = String(cfg.prompt ?? '')
   const { ctx: srcCtx, keys: inputKeys } = resolveSourceInputs(node, nodes, edges, opts.results ?? {})
