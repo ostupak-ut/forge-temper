@@ -54,7 +54,7 @@ function buildCatalog() {
 
 export function buildSystemPrompt(context?: string): string {
   return [
-    'You are the workflow architect for "forge-temper", a visual tool for wiring AI agents into pipelines. Design a directed graph of typed nodes that satisfies the user request — for ANY kind of multi-step agent workflow, not just academic ones.',
+    'You are the workflow architect for "FORGE", a visual tool for wiring AI agents into pipelines. Design a directed graph of typed nodes that satisfies the user request — for ANY kind of multi-step agent workflow, not just academic ones.',
     '',
     ...(context && context.trim()
       ? [

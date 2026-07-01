@@ -4,14 +4,51 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Visual flow modeller that automates the forge<->temper paper-prototyping loop via local Claude Code",
+  "author": "Oleh Stupak <oleh.stupak55@gmail.com>",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "concurrently -n web,server -c cyan,magenta \"npm:dev:web\" \"npm:dev:server\"",
     "dev:web": "vite",
     "dev:server": "tsx watch server/index.ts",
     "build": "tsc --noEmit && vite build",
+    "build:web": "vite build",
+    "build:server": "esbuild server/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist-electron/server.mjs --tsconfig=tsconfig.json",
+    "electron:dev": "npm run build:web && npm run build:server && electron .",
+    "dist:win": "npm run build:web && npm run build:server && electron-builder --win",
+    "dist:mac": "npm run build:web && npm run build:server && electron-builder --mac",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "server": "tsx server/index.ts"
+  },
+  "build": {
+    "appId": "com.olehstupak.forge",
+    "productName": "FORGE",
+    "asar": false,
+    "npmRebuild": false,
+    "files": [
+      "electron/**",
+      "dist/**",
+      "dist-electron/**",
+      "license/**",
+      "!**/*.map",
+      "!node_modules/better-sqlite3/**"
+    ],
+    "win": {
+      "target": ["nsis"],
+      "artifactName": "FORGE-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "mac": {
+      "target": ["dmg"],
+      "category": "public.app-category.developer-tools"
+    },
+    "directories": {
+      "output": "release"
+    }
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.181",
@@ -41,6 +78,9 @@
     "@vitejs/plugin-react": "^6.0.2",
     "autoprefixer": "^10.5.0",
     "concurrently": "^10.0.3",
+    "electron": "^33.3.0",
+    "electron-builder": "^25.1.8",
+    "esbuild": "^0.24.2",
     "postcss": "^8.5.15",
     "tailwindcss": "^3.4.19",
     "tsx": "^4.22.4",

@@ -23,3 +23,10 @@ workspace/
 **/.credentials.json
 **/*.key
 **/.env
+
+# license signing keys (the PRIVATE key must NEVER be committed or shipped) +
+# issued licenses + Electron packaging output.
+.secrets/
+*.license
+dist-electron/
+release/

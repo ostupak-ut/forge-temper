@@ -36,5 +36,6 @@ export function setWorkspaceDir(dir: string | null): void {
   }
 }
 
-/** Run-history DB + transient run data. */
-export const DATA_DIR = path.resolve(process.cwd(), '.forge-temper')
+/** Run-history DB + transient run data. Env-overridable so the packaged app can
+ *  point it at the OS user-data dir (Electron main sets FT_DATA_DIR). */
+export const DATA_DIR = process.env.FT_DATA_DIR ?? path.resolve(process.cwd(), '.forge-temper')

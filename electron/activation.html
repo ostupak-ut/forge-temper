@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FORGE — Активація</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; min-height: 100vh; display: grid; place-items: center;
+        background: radial-gradient(1200px 600px at 50% -10%, #17131f, #0b0b0f);
+        color: #e7e5ea; font: 14px/1.5 -apple-system, Segoe UI, Roboto, sans-serif;
+      }
+      .card {
+        width: 560px; max-width: 92vw; padding: 28px 30px;
+        background: #14141b; border: 1px solid #2a2a35; border-radius: 16px;
+        box-shadow: 0 20px 60px rgba(0,0,0,.5);
+      }
+      h1 { margin: 0 0 4px; font-size: 18px; }
+      .sub { color: #9a97a6; margin: 0 0 18px; font-size: 13px; }
+      .reason { background: #2a1e22; border: 1px solid #5b2b34; color: #f3b7c0;
+        padding: 8px 12px; border-radius: 9px; margin-bottom: 18px; font-size: 12.5px; }
+      label { display: block; font-size: 12px; color: #9a97a6; margin: 16px 0 6px; text-transform: uppercase; letter-spacing: .04em; }
+      .mid { display: flex; gap: 8px; align-items: center; }
+      code { flex: 1; background: #0e0e14; border: 1px solid #2a2a35; border-radius: 9px;
+        padding: 9px 11px; font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: #b9e6c6; word-break: break-all; }
+      textarea { width: 100%; height: 92px; resize: vertical; background: #0e0e14; color: #e7e5ea;
+        border: 1px solid #2a2a35; border-radius: 9px; padding: 10px 12px; font: 12px ui-monospace, monospace; }
+      textarea:focus { outline: none; border-color: #7c5cff; }
+      button { border: 0; border-radius: 9px; padding: 9px 14px; font-size: 13px; font-weight: 600; cursor: pointer; }
+      .ghost { background: #23232e; color: #cfcdd8; }
+      .ghost:hover { background: #2c2c3a; }
+      .primary { background: #7c5cff; color: #fff; width: 100%; margin-top: 14px; padding: 11px; }
+      .primary:hover { background: #6b4cf0; }
+      .msg { margin-top: 12px; font-size: 12.5px; min-height: 18px; }
+      .ok { color: #7fe6a1; }
+      .err { color: #f3b7c0; }
+      .hint { color: #7b7887; font-size: 12px; margin-top: 6px; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>FORGE</h1>
+      <p class="sub">Ця збірка ліцензується окремо для кожного тестувальника. Вставте свій ключ ліцензії, щоб активувати.</p>
+      <div id="reason" class="reason" style="display:none"></div>
+
+      <label>Ваш ID пристрою (надішліть його, щоб отримати ліцензію)</label>
+      <div class="mid">
+        <code id="machine">…</code>
+        <button class="ghost" id="copy">Копіювати</button>
+      </div>
+      <p class="hint">Надішліть цей ID постачальнику — він поверне ключ ліцензії, прив’язаний саме до цього пристрою.</p>
+
+      <label>Ключ ліцензії</label>
+      <textarea id="key" placeholder="вставте сюди ваш ключ ліцензії…" spellcheck="false"></textarea>
+      <button class="primary" id="activate">Активувати</button>
+      <div id="msg" class="msg"></div>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id)
+      async function boot() {
+        const info = await window.lic.info()
+        $('machine').textContent = info.machine
+        if (info.reason) { $('reason').textContent = info.reason; $('reason').style.display = 'block' }
+      }
+      $('copy').onclick = async () => {
+        await window.lic.copy($('machine').textContent)
+        $('copy').textContent = 'Copied'
+        setTimeout(() => ($('copy').textContent = 'Copy'), 1200)
+      }
+      $('activate').onclick = async () => {
+        const msg = $('msg')
+        msg.className = 'msg'; msg.textContent = 'Checking…'
+        const res = await window.lic.submit($('key').value)
+        if (res.ok) {
+          msg.className = 'msg ok'
+          msg.textContent = 'Activated for ' + (res.tester || 'you') + ' — starting…'
+        } else {
+          msg.className = 'msg err'
+          msg.textContent = res.reason || 'Invalid license.'
+        }
+      }
+      boot()
+    </script>
+  </body>
+</html>
