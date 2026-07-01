@@ -98,6 +98,16 @@ export function getCli(name: CliName): string | undefined {
   return typeof v === 'string' && v.trim() ? v.trim() : undefined
 }
 
+/**
+ * The claude executable to hand the Agent SDK: an explicit Settings override
+ * first, else `FT_CLAUDE_BIN` (set by the portable launcher to the machine's
+ * `claude` on PATH — the portable build bundles the SDK's JS but not its 214MB
+ * platform binary). Undefined → the SDK uses its own bundled CLI (Electron).
+ */
+export function getClaudeExec(): string | undefined {
+  return getCli('claude') ?? (process.env.FT_CLAUDE_BIN?.trim() || undefined)
+}
+
 export function getCliSettings(): Record<CliName, string> {
   return { codex: cli.codex ?? '', claude: cli.claude ?? '' }
 }

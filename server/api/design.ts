@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { spawn } from 'node:child_process'
 import { query, type Options } from '@anthropic-ai/claude-agent-sdk'
-import { getCli, getKey } from '../persistence/settingsStore'
+import { getClaudeExec, getKey } from '../persistence/settingsStore'
 import { resolveCodexBin } from '../run/codexRunner'
 
 interface ChatMsg {
@@ -25,7 +25,7 @@ async function openrouterComplete(opts: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
       'HTTP-Referer': 'http://localhost:5173',
-      'X-Title': 'forge-temper',
+      'X-Title': 'FORGE',
     },
     body: JSON.stringify({
       // Default to a non-Claude model — for Claude, use the Claude Code provider.
@@ -67,7 +67,7 @@ async function claudeComplete(opts: {
     systemPrompt: opts.system,
     maxTurns: 1,
     ...(opts.model && opts.model !== 'inherit' ? { model: opts.model } : {}),
-    ...(getCli('claude') ? { pathToClaudeCodeExecutable: getCli('claude') } : {}),
+    ...(getClaudeExec() ? { pathToClaudeCodeExecutable: getClaudeExec() } : {}),
   }
 
   let text = ''

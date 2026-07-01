@@ -1,7 +1,7 @@
 import { query, type Options } from '@anthropic-ai/claude-agent-sdk'
 import { emitEvent } from './runEvents'
 import { runStore } from '../persistence/runStore'
-import { getCli } from '../persistence/settingsStore'
+import { getClaudeExec } from '../persistence/settingsStore'
 import type { ProviderRunParams, ProviderRunResult } from '../providers/types'
 
 /** Execute a single node by invoking local Claude Code, streaming events out. */
@@ -35,8 +35,9 @@ export async function runNode(p: ProviderRunParams): Promise<ProviderRunResult> 
     ...(p.effort && ['low', 'medium', 'high', 'xhigh', 'max'].includes(p.effort)
       ? { effort: p.effort as 'low' | 'medium' | 'high' | 'xhigh' | 'max' }
       : {}),
-    // Settings → CLI paths: override the claude binary the SDK spawns.
-    ...(getCli('claude') ? { pathToClaudeCodeExecutable: getCli('claude') } : {}),
+    // Settings → CLI paths (or FT_CLAUDE_BIN in the portable build): override
+    // the claude binary the SDK spawns.
+    ...(getClaudeExec() ? { pathToClaudeCodeExecutable: getClaudeExec() } : {}),
   }
 
   let resultText = ''
