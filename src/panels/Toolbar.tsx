@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { CirclePlay, Download, FilePlus2, FolderOpen, Play, Save, SaveAll, Split, Sparkles, Square, Trash2, Upload, Wand2 } from 'lucide-react'
 import { DesignChat } from '@/panels/DesignChat'
+import { useT } from '@/i18n'
 import { useGraphStore } from '@/store/graphStore'
 import { buildStarterGraph } from '@/io/sampleGraph'
 import { runGraph, stopCurrentRun } from '@/run/runController'
@@ -148,6 +149,7 @@ export function Toolbar() {
   const [designOpen, setDesignOpen] = useState(false)
   const [parallel, setParallel] = useState(() => localStorage.getItem('ft.parallel') === '1')
   const [concurrency, setConcurrency] = useState(() => Number(localStorage.getItem('ft.concurrency')) || 2)
+  const t = useT()
 
   const toggleParallel = () => {
     const v = !parallel
@@ -204,7 +206,7 @@ export function Toolbar() {
   }
 
   const onSaveAs = async () => {
-    const name = window.prompt('Save flow as:', current ?? 'my-flow')?.trim()
+    const name = window.prompt(t('Save flow as:'), current ?? 'my-flow')?.trim()
     if (name) await doSave(name)
   }
 
@@ -267,26 +269,26 @@ export function Toolbar() {
 
   return (
     <div className="flex items-center gap-2 border-b border-border/10 bg-field px-3 py-1.5">
-      <button className={btn} onClick={onNew} title="New empty flow">
-        <FilePlus2 className="size-3.5" /> New
+      <button className={btn} onClick={onNew} title={t('New empty flow')}>
+        <FilePlus2 className="size-3.5" /> {t('New')}
       </button>
       <button
         className={btn + ' !border-amber-400/30 !bg-amber-500/10 text-amber-200 hover:!bg-amber-500/20'}
-        title="Load the standard InfoCard → Loop[Forge↔Temper] → Body → Assemble workflow"
+        title={t('Load the standard InfoCard → Loop[Forge↔Temper] → Body → Assemble workflow')}
         onClick={() => {
           const g = buildStarterGraph()
           setGraph(g.nodes, g.edges)
           setName(null)
         }}
       >
-        <Sparkles className="size-3.5" /> Starter
+        <Sparkles className="size-3.5" /> {t('Starter')}
       </button>
       <button
         className={btn + ' !border-temper/40 !bg-temper/10 text-temper hover:!bg-temper/20'}
-        title="Describe a workflow in plain English — an AI designs the graph for you"
+        title={t('Describe a workflow in plain English — an AI designs the graph for you')}
         onClick={() => setDesignOpen(true)}
       >
-        <Wand2 className="size-3.5" /> Design with AI
+        <Wand2 className="size-3.5" /> {t('Design with AI')}
       </button>
 
       <div className="relative">
@@ -296,16 +298,16 @@ export function Toolbar() {
             void refresh()
             setMenuOpen((o) => !o)
           }}
-          title="Open or manage saved flows"
+          title={t('Open or manage saved flows')}
         >
-          <FolderOpen className="size-3.5" /> Open ▾
+          <FolderOpen className="size-3.5" /> {t('Open')} ▾
         </button>
         {menuOpen && (
           <>
             <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
             <div className="absolute left-0 top-full z-20 mt-1 max-h-72 w-56 overflow-auto rounded-md border border-border/15 bg-card p-1 shadow-xl">
               {flows.length === 0 && (
-                <p className="px-2 py-2 text-[11px] text-fg/40">No saved flows yet — use Save / Save As.</p>
+                <p className="px-2 py-2 text-[11px] text-fg/40">{t('No saved flows yet — use Save / Save As.')}</p>
               )}
               {flows.map((f) => (
                 <div
@@ -335,22 +337,22 @@ export function Toolbar() {
         )}
       </div>
 
-      <button className={btn} onClick={onSave} title="Save (Ctrl+S)">
-        <Save className="size-3.5" /> Save
+      <button className={btn} onClick={onSave} title={t('Save (Ctrl+S)')}>
+        <Save className="size-3.5" /> {t('Save')}
       </button>
-      <button className={btn} onClick={onSaveAs} title="Save as a new name">
-        <SaveAll className="size-3.5" /> Save As
+      <button className={btn} onClick={onSaveAs} title={t('Save as a new name')}>
+        <SaveAll className="size-3.5" /> {t('Save As')}
       </button>
 
       <span className="ml-1 text-[11px] text-fg/40">
-        {current ? <span className="text-fg/70">{current}</span> : <span className="italic">unsaved</span>}
+        {current ? <span className="text-fg/70">{current}</span> : <span className="italic">{t('unsaved')}</span>}
         {dirtyMsg && <span className="ml-2 text-emerald-300">{dirtyMsg}</span>}
       </span>
 
       <div className="ml-auto flex items-center gap-2">
         <button
           className={btn}
-          title="Export to a .json file"
+          title={t('Export to a .json file')}
           onClick={() => {
             const { nodes, edges } = useGraphStore.getState()
             downloadGraph(serializeGraph(nodes, edges), `${current ?? 'flow'}.ftflow.json`)
@@ -360,7 +362,7 @@ export function Toolbar() {
         </button>
         <button
           className={btn}
-          title="Import a .json file"
+          title={t('Import a .json file')}
           onClick={async () => {
             const doc = await loadGraphFromFile()
             if (doc) {
@@ -374,9 +376,9 @@ export function Toolbar() {
         <button
           className={btn}
           onClick={onDemoRun}
-          title="Dry run — walks the flow order and animates edges/status WITHOUT calling any agent (no tokens spent). To really run, use Run Graph, or the ▶ on a node."
+          title={t('Dry run — walks the flow order and animates edges/status WITHOUT calling any agent (no tokens spent). To really run, use Run Graph, or the ▶ on a node.')}
         >
-          <Play className="size-3.5" /> Dry Run
+          <Play className="size-3.5" /> {t('Dry Run')}
         </button>
         {/* Run-mode toggle JOINED to Run Graph, so it reads as "the mode this run uses". */}
         <div className="flex items-center">
@@ -384,8 +386,8 @@ export function Toolbar() {
             onClick={toggleParallel}
             title={
               parallel
-                ? 'Parallel: independent same-stage nodes run concurrently (max set to the right, working-dir-guarded). Click for sequential.'
-                : 'Sequential: one node at a time (safe). Click to run independent nodes in parallel.'
+                ? t('Parallel: independent same-stage nodes run concurrently (max set to the right, working-dir-guarded). Click for sequential.')
+                : t('Sequential: one node at a time (safe). Click to run independent nodes in parallel.')
             }
             className={
               'flex items-center gap-1 rounded-l-md border border-r-0 px-2 py-1 text-xs transition ' +
@@ -394,12 +396,12 @@ export function Toolbar() {
                 : 'border-border/10 bg-field text-fg/60 hover:bg-fg/[0.08]')
             }
           >
-            <Split className="size-3.5" /> {parallel ? 'Parallel' : 'Sequential'}
+            <Split className="size-3.5" /> {parallel ? t('Parallel') : t('Sequential')}
           </button>
           {parallel && (
             <button
               onClick={() => changeConcurrency(concurrency >= 6 ? 1 : concurrency + 1)}
-              title="Max agents running at once (click to cycle 1–6). Lower to 1–2 if Claude returns 500 / 'overloaded' on big outputs."
+              title={t('Max agents running at once (click to cycle 1–6). Lower to 1–2 if Claude returns 500 / ‘overloaded’ on big outputs.')}
               className="border border-l-0 border-violet-400/60 bg-violet-500/30 px-2 py-1 text-xs font-medium tabular-nums text-violet-50 transition hover:bg-violet-500/40"
             >
               {concurrency}×
@@ -409,17 +411,17 @@ export function Toolbar() {
             <button
               className="flex items-center gap-1.5 rounded-r-md border border-red-400/40 bg-red-500/15 px-2.5 py-1 text-xs text-red-200 transition hover:bg-red-500/25"
               onClick={() => void stopCurrentRun()}
-              title="Stop the running graph"
+              title={t('Stop the running graph')}
             >
-              <Square className="size-3.5" /> Stop
+              <Square className="size-3.5" /> {t('Stop')}
             </button>
           ) : (
             <button
               className="flex items-center gap-1.5 rounded-r-md border border-emerald-400/40 bg-emerald-500/15 px-2.5 py-1 text-xs text-emerald-200 transition hover:bg-emerald-500/25"
               onClick={() => void runGraph(parallel, concurrency)}
-              title="Run the whole graph in dependency order, iterating any loops until they pass or hit the cap."
+              title={t('Run the whole graph in dependency order, iterating any loops until they pass or hit the cap.')}
             >
-              <CirclePlay className="size-3.5" /> Run Graph
+              <CirclePlay className="size-3.5" /> {t('Run Graph')}
             </button>
           )}
         </div>

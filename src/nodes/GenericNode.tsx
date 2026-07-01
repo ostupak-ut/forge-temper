@@ -10,6 +10,7 @@ import type { Port } from '@/registry/types'
 import type { NodeRunStatus } from '@shared/contracts'
 import { runSingleNode, stopCurrentRun } from '@/run/runController'
 import { DiscBar } from '@/components/DiscBar'
+import { useT } from '@/i18n'
 import { cn } from '@/lib/cn'
 
 // idle/skipped show no ring (just the node's thin border) — a 2px grey ring on
@@ -77,6 +78,7 @@ function PortRow({ port, dir }: { port: Port; dir: 'in' | 'out' }) {
 }
 
 function GenericNodeImpl({ id, data, selected }: NodeProps<FtNode>) {
+  const t = useT()
   const spec = getSpec(data.kind)
   const cfgColor = (data.config as { color?: unknown })?.color
   const accent = typeof cfgColor === 'string' && cfgColor ? cfgColor : spec.color
@@ -121,7 +123,7 @@ function GenericNodeImpl({ id, data, selected }: NodeProps<FtNode>) {
           (busy ? (
             <button
               className="nodrag rounded p-0.5 text-red-300 hover:bg-red-500/20"
-              title="Stop"
+              title={t('Stop')}
               onClick={(e) => {
                 e.stopPropagation()
                 stopCurrentRun()
@@ -132,7 +134,7 @@ function GenericNodeImpl({ id, data, selected }: NodeProps<FtNode>) {
           ) : (
             <button
               className="nodrag rounded p-0.5 text-emerald-300 hover:bg-emerald-500/20"
-              title="Run this node"
+              title={t('Run this node')}
               onClick={(e) => {
                 e.stopPropagation()
                 runSingleNode(id)
@@ -143,7 +145,7 @@ function GenericNodeImpl({ id, data, selected }: NodeProps<FtNode>) {
           ))}
         <button
           className="nodrag rounded p-0.5 text-fg/30 hover:bg-red-500/20 hover:text-red-300"
-          title="Delete node"
+          title={t('Delete node')}
           onClick={(e) => {
             e.stopPropagation()
             deleteNode(id)
@@ -183,7 +185,7 @@ function GenericNodeImpl({ id, data, selected }: NodeProps<FtNode>) {
           <p className="line-clamp-2 text-[11px] text-fg/35">
             {(typeof (data.config as { description?: unknown })?.description === 'string' &&
               ((data.config as { description?: string }).description ?? '').trim()) ||
-              spec.description}
+              t(spec.description)}
           </p>
         )}
         {run?.verdict && (

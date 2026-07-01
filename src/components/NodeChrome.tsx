@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { AGENT_ICONS, ICON_NAMES, resolveNodeIcon } from '@/registry/icons'
+import { useT } from '@/i18n'
 import { cn } from '@/lib/cn'
 
 /** Click a node's title to rename it inline on the canvas. */
@@ -15,6 +16,7 @@ export function EditableTitle({
   className?: string
   placeholder?: string
 }) {
+  const t = useT()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
 
@@ -53,9 +55,9 @@ export function EditableTitle({
     <button
       className={cn('min-w-0 truncate text-left', className)}
       onDoubleClick={start}
-      title="Double-click to rename"
+      title={t('Double-click to rename')}
     >
-      {value || <span className="italic text-fg/40">{placeholder}</span>}
+      {value || <span className="italic text-fg/40">{t(placeholder)}</span>}
     </button>
   )
 }
@@ -87,6 +89,7 @@ export function IconColorMenu({
   onColor: (hex: string) => void
   iconStyle?: CSSProperties
 }) {
+  const t = useT()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const Icon = resolveNodeIcon(symbol, fallbackIcon)
@@ -104,7 +107,7 @@ export function IconColorMenu({
     <div className="relative shrink-0" ref={ref}>
       <button
         className="-m-0.5 rounded p-0.5 hover:bg-fg/10"
-        title="Double-click to change icon & color"
+        title={t('Double-click to change icon & color')}
         onDoubleClick={(e) => {
           e.stopPropagation()
           setOpen((o) => !o)
@@ -132,7 +135,7 @@ export function IconColorMenu({
             ))}
             <label
               className="grid size-4 cursor-pointer place-items-center overflow-hidden rounded-full ring-1 ring-black/20"
-              title="Custom color"
+              title={t('Custom color')}
               style={{ background: color }}
             >
               <input

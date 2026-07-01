@@ -6,6 +6,7 @@ import { resolveNodeIcon } from '@/registry/icons'
 import { useGraphStore } from '@/store/graphStore'
 import { usePresets } from '@/io/customPresets'
 import { DRAG_MIME, DRAG_PRESET } from '@/canvas/FlowCanvas'
+import { useT } from '@/i18n'
 import { cn } from '@/lib/cn'
 import type { NodeKind } from '@/registry/types'
 
@@ -17,6 +18,7 @@ export function Palette() {
   const setSelected = useGraphStore((s) => s.setSelected)
   const presets = usePresets((s) => s.presets)
   const removePreset = usePresets((s) => s.remove)
+  const t = useT()
   const { screenToFlowPosition } = useReactFlow()
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) === '1')
 
@@ -64,7 +66,7 @@ export function Palette() {
     >
       <button
         onClick={toggle}
-        title={collapsed ? 'Expand palette' : 'Collapse palette'}
+        title={collapsed ? t('Expand palette') : t('Collapse palette')}
         className={cn(
           'mb-1 flex items-center rounded text-fg/40 transition hover:bg-fg/10 hover:text-fg/80',
           collapsed ? 'justify-center p-1.5' : 'gap-1.5 self-start px-1.5 py-1',
@@ -77,19 +79,19 @@ export function Palette() {
         draggable
         onDragStart={(e) => onDragStart(e, 'custom')}
         onClick={newCustomAgent}
-        title="Create a freely-wireable custom agent — click to add, or drag onto the canvas."
+        title={t('Create a freely-wireable custom agent — click to add, or drag onto the canvas.')}
         className={itemCls(
           'mb-2 border-dashed border-temper/60 bg-temper/10 font-medium text-temper hover:border-temper hover:bg-temper/20',
         )}
       >
         <Sparkles className="size-4 shrink-0" />
-        {!collapsed && <span className="truncate">Custom Agent</span>}
+        {!collapsed && <span className="truncate">{t('Custom Agent')}</span>}
       </button>
 
       {presets.length > 0 && (
         <>
           {!collapsed && (
-            <p className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-fg/30">My Agents</p>
+            <p className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-fg/30">{t('My Agents')}</p>
           )}
           {presets.map((p) => {
             const Icon = resolveNodeIcon(p.symbol, Sparkles)
@@ -122,7 +124,7 @@ export function Palette() {
                 {!collapsed && (
                   <button
                     className="rounded p-0.5 text-fg/25 opacity-0 transition hover:bg-red-500/20 hover:text-red-300 group-hover:opacity-100"
-                    title="Remove from Palette"
+                    title={t('Remove from Palette')}
                     onClick={() => removePreset(p.id)}
                   >
                     <X className="size-3" />
@@ -135,7 +137,7 @@ export function Palette() {
       )}
 
       {!collapsed && (
-        <p className="px-1 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-fg/30">Nodes</p>
+        <p className="px-1 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-fg/30">{t('Nodes')}</p>
       )}
       {ALL_KINDS.filter((kind) => kind !== 'custom' && !getSpec(kind).hidePalette).map((kind) => {
         const spec = getSpec(kind)
@@ -146,18 +148,17 @@ export function Palette() {
             draggable
             onDragStart={(e) => onDragStart(e, kind)}
             onClick={() => addAtCenter(kind)}
-            title={collapsed ? spec.label : `${spec.description}\n(click to add, or drag onto the canvas)`}
+            title={collapsed ? t(spec.label) : `${t(spec.description)}\n${t('(click to add, or drag onto the canvas)')}`}
             className={itemCls('border-border/5 bg-fg/[0.03] text-fg/80 hover:border-border/20 hover:bg-fg/[0.07]')}
           >
             <Icon className="size-4 shrink-0" style={{ color: spec.color }} />
-            {!collapsed && <span className="truncate">{spec.label}</span>}
+            {!collapsed && <span className="truncate">{t(spec.label)}</span>}
           </button>
         )
       })}
       {!collapsed && (
         <p className="mt-auto px-1 pt-2 text-[10px] leading-tight text-fg/25">
-          Click to add, or drag onto the canvas. Save a configured Custom Agent (★ in its Properties panel) to reuse it
-          here.
+          {t('Click to add, or drag onto the canvas. Save a configured Custom Agent (★ in its Properties panel) to reuse it here.')}
         </p>
       )}
     </div>
